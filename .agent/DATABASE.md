@@ -357,6 +357,48 @@ model LoanRefinance {
 
 ---
 
+## Migraciones y Seeding (Prisma 7)
+
+### Configuración
+En **Prisma 7**, las migraciones y la ejecución de seeds se centralizan en `prisma.config.ts` (en lugar de `package.json`):
+```typescript
+export default defineConfig({
+  schema: 'prisma/schema.prisma',
+  migrations: {
+    path: 'prisma/migrations',
+    seed: 'tsx prisma/seed.ts', // Se utiliza tsx para soportar módulos ESNext/ESM directamente
+  },
+  datasource: {
+    url: process.env['DATABASE_URL'],
+  },
+});
+```
+
+### Script de Seed (`prisma/seed.ts`)
+El script de inicialización realiza las siguientes operaciones en orden:
+1. **Conexión Nativa (`@prisma/adapter-pg`)**: Crea un pool con `pg` y su adaptador, lo cual es obligatorio en la configuración actual de Prisma v7.
+2. **Usuario Administrador**: Realiza un `upsert` para crear el usuario administrador inicial si no existe:
+   - **Username**: `admin`
+   - **Password**: `admin123` (hasheada con bcrypt)
+   - **Role**: `admin`
+3. **Configuración de Negocio**: Crea un registro básico en `business_config` para el administrador con parámetros por defecto de moneda (`BOB`), tasa de interés (`10.00%`), días de gracia (`2`), y tipo de periodo diario (`daily`).
+
+### Comandos de Base de Datos (pnpm)
+- **Ejecutar Seed manualmente**:
+  ```bash
+  pnpm exec prisma db seed
+  ```
+- **Crear y aplicar migraciones**:
+  ```bash
+  pnpm exec prisma migrate dev --name <nombre_migracion>
+  ```
+- **Sincronizar base de datos sin generar migración**:
+  ```bash
+  pnpm exec prisma db push
+  ```
+
+---
+
 ## Tablas post-MVP (no implementar ahora)
 
 - `visit_logs` — registro de visitas de cobro sin éxito

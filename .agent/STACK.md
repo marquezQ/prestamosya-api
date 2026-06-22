@@ -18,6 +18,7 @@ Stack tecnológico, infraestructura, variables de entorno y decisiones técnicas
 | Documentación | Swagger (OpenAPI) en `/api/docs` |
 | Servidor | VPS Ubuntu + Nginx + PM2 + CI/CD via GitHub Actions |
 | Package manager | pnpm |
+| Linter & Formatter | ESLint + Prettier + EditorConfig (con formateo al guardar en VS Code) |
 
 ---
 
@@ -85,8 +86,8 @@ El proyecto se gestiona en Linear bajo el proyecto **PrestApp — App de Présta
 Cada rama de git debe corresponder a un ticket: `feature/PED-XX-descripcion-breve`
 
 Sprint 0 activo (hasta 16 jun):
-- PED-5 — Schema Prisma ← IN PROGRESS
+- PED-5 — Schema Prisma ← DONE
 - PED-7 — Inicializar repo NestJS
-- PED-9 — Migraciones y seed
+- PED-9 — Migraciones y seed ← DONE
 - PED-6 — Setup VPS
 - PED-10 — Configurar VPS
