@@ -50,4 +50,10 @@ export class AuthService {
       },
     };
   }
+
+  logout(): { message: string } {
+    // En V1 sin estado, el logout ocurre eliminando el token en el cliente.
+    // Se deja este método listo para cuando en V2 necesitemos invalidar registros en la BD.
+    return { message: 'Sesión cerrada correctamente' };
+  }
 }

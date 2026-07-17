@@ -42,3 +42,21 @@ export function ApiMeDoc() {
     }),
   );
 }
+
+// Documentación de Swagger para el endpoint POST /auth/logout
+export function ApiLogoutDoc() {
+  return applyDecorators(
+    ApiOperation({
+      summary: 'Cerrar sesión',
+      description: 'Invalida la sesión actual (del lado del cliente).',
+    }),
+    ApiResponse({
+      status: HttpStatus.OK,
+      description: 'Sesión cerrada exitosamente.',
+    }),
+    ApiResponse({
+      status: HttpStatus.UNAUTHORIZED,
+      description: 'Token ausente o inválido.',
+    }),
+  );
+}
