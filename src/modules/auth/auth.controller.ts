@@ -13,7 +13,7 @@ import { Public } from './decorators/public.decorator';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
-import { ApiLoginDoc, ApiMeDoc } from './auth.docs';
+import { ApiLoginDoc, ApiLogoutDoc, ApiMeDoc } from './auth.docs';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -33,5 +33,13 @@ export class AuthController {
   @ApiMeDoc()
   getMe(@CurrentUser() user: JwtPayload): JwtPayload {
     return user;
+  }
+
+  @Post('logout')
+  @ApiBearerAuth('access-token')
+  @HttpCode(HttpStatus.OK)
+  @ApiLogoutDoc()
+  logout(): { message: string } {
+    return this.authService.logout();
   }
 }

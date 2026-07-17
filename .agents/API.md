@@ -12,9 +12,10 @@ Todas las rutas requieren `Authorization: Bearer <access_token>` excepto las mar
 ```
 POST   /api/auth/login           → { accessToken, user }              [público]
 GET    /api/auth/me              → User payload                       [protegido]
+POST   /api/auth/logout          → { message }                        [protegido]
 ```
 
-> Nota: Refresh tokens (`/api/auth/refresh`) y logout (`/api/auth/logout`) están planeados para versiones futuras y están fuera del alcance actual.
+> Nota: Refresh tokens (`/api/auth/refresh`) están planeados para versiones futuras y están fuera del alcance actual.
 
 ---
 
