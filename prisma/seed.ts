@@ -2,6 +2,13 @@ import 'dotenv/config';
 import { PrismaClient } from '../src/generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
+import * as bcrypt from 'bcrypt';
+
+// ⚠️ CREDENCIALES DE DESARROLLO — Solo para seed inicial.
+// Cambiar la contraseña en producción vía endpoint o script separado.
+const SEED_USERNAME = 'admin';
+const SEED_PASSWORD = 'admin123';
+const BCRYPT_ROUNDS = 12; // Según CONVENTIONS.md
 
 // Configurar el pool de conexiones con pg
 const pool = new Pool({
@@ -15,17 +22,19 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   console.log('🌱 Iniciando la siembra de la base de datos (seeding)...');
 
-  // 1. Crear usuario administrador inicial
-  // Nota: El hash de la contraseña de ejemplo corresponde a "admin123" usando bcrypt
-  const adminUsername = 'admin';
+  // 1. Hashear la contraseña en runtime (12 rounds según CONVENTIONS.md)
+  const passwordHash = await bcrypt.hash(SEED_PASSWORD, BCRYPT_ROUNDS);
+
+  // 2. Crear usuario administrador inicial
   const defaultAdmin = await prisma.user.upsert({
-    where: { username: adminUsername },
-    update: {},
+    where: { username: SEED_USERNAME },
+    update: {
+      passwordHash, // Permite actualizar/restaurar la contraseña si se vuelve a correr el seed
+    },
     create: {
       name: 'Administrador Principal',
-      username: adminUsername,
-      passwordHash:
-        '$2b$10$y5U6.s4h.6J8TqR5jJ6hdeU2Hh1kF883F21tHjRzE4z1O6eF3/bWy', // hash para "admin123"
+      username: SEED_USERNAME,
+      passwordHash,
       role: 'admin',
       isActive: true,
     },
@@ -35,6 +44,7 @@ async function main() {
     `✅ Usuario administrador creado o existente: "${defaultAdmin.username}"`,
   );
 
+  // 3. Crear configuración de negocio inicial
   await prisma.businessConfig.upsert({
     where: { userId: defaultAdmin.id },
     update: {},
@@ -50,9 +60,14 @@ async function main() {
   });
 
   console.log(
-    `✅ Configuración de negocio inicial creada o existente para el usuario: "${defaultAdmin.name}"`,
+    `✅ Configuración de negocio inicial creada o existente para: "${defaultAdmin.name}"`,
   );
   console.log('🌱 Seeding finalizado con éxito.');
+  console.log('');
+  console.log('📋 Credenciales de desarrollo:');
+  console.log(`   Username: ${SEED_USERNAME}`);
+  console.log(`   Password: ${SEED_PASSWORD}`);
+  console.log('   ⚠️  Cambiar en producción.');
 }
 
 main()

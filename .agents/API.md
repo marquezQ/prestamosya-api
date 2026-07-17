@@ -1,20 +1,20 @@
 # API.md — prestamosya-api
 
 Inventario completo de endpoints REST del backend.
-Prefijo global: `/api`. Documentación interactiva disponible en `/api/docs` (Swagger).
+Prefijo global: `/api`. Documentación interactiva disponible en `/api` (Swagger UI) y especificación JSON disponible en `/api-json` (Postman).
 
 Todas las rutas requieren `Authorization: Bearer <access_token>` excepto las marcadas como públicas.
 
 ---
 
-## Auth (público)
+## Auth (público / protegido)
 
 ```
-POST   /api/auth/login           → { access_token, refresh_token }
-POST   /api/auth/refresh         → { access_token }
-POST   /api/auth/logout          → 200 OK
-GET    /api/auth/me              → User                              [protegido]
+POST   /api/auth/login           → { accessToken, user }              [público]
+GET    /api/auth/me              → User payload                       [protegido]
 ```
+
+> Nota: Refresh tokens (`/api/auth/refresh`) y logout (`/api/auth/logout`) están planeados para versiones futuras y están fuera del alcance actual.
 
 ---
 
