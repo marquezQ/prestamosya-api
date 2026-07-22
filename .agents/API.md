@@ -22,11 +22,11 @@ POST   /api/auth/logout          → { message }                        [protegi
 ## Clients
 
 ```
-GET    /api/clients              → Client[] (búsqueda, filtros, paginación)
-POST   /api/clients              → Client
-GET    /api/clients/:id          → ClientProfile (con préstamos, garantías, resumen)
-PATCH  /api/clients/:id          → Client
-DELETE /api/clients/:id          → 200 OK (soft delete)
+GET    /api/clients               → Client[]
+POST   /api/clients               → Client
+GET    /api/clients/:id           → ClientProfile (con préstamos activos, garantías, resumen financiero)
+PATCH  /api/clients/:id           → Client
+DELETE /api/clients/:id           → 200 OK (soft delete)
 ```
 
 ---

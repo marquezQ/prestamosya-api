@@ -377,11 +377,11 @@ export default defineConfig({
 ### Script de Seed (`prisma/seed.ts`)
 El script de inicialización realiza las siguientes operaciones en orden:
 1. **Conexión Nativa (`@prisma/adapter-pg`)**: Crea un pool con `pg` y su adaptador, lo cual es obligatorio en la configuración actual de Prisma v7.
-2. **Usuario Administrador**: Realiza un `upsert` para crear el usuario administrador inicial si no existe:
-   - **Username**: `admin`
-   - **Password**: `admin123` (hasheada con bcrypt)
-   - **Role**: `admin`
-3. **Configuración de Negocio**: Crea un registro básico en `business_config` para el administrador con parámetros por defecto de moneda (`BOB`), tasa de interés (`10.00%`), días de gracia (`2`), y tipo de periodo diario (`daily`).
+2. **Usuarios Administradores**: Realiza un `upsert` para crear dos administradores:
+   - **Admin 1**: username `admin`, password `admin123` — 2 clientes asignados
+   - **Admin 2**: username `admin2`, password `admin123` — 1 cliente asignado
+3. **Configuración de Negocio**: Crea un registro en `business_config` para cada administrador.
+4. **Clientes**: Crea 3 clientes totales (2 para admin1, 1 para admin2) con datos de prueba variados.
 
 ### Comandos de Base de Datos (pnpm)
 - **Ejecutar Seed manualmente**:
