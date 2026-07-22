@@ -6,7 +6,7 @@ import {
   HttpStatus,
   Post,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
@@ -29,14 +29,12 @@ export class AuthController {
   }
 
   @Get('me')
-  @ApiBearerAuth('access-token')
   @ApiMeDoc()
   getMe(@CurrentUser() user: JwtPayload): JwtPayload {
     return user;
   }
 
   @Post('logout')
-  @ApiBearerAuth('access-token')
   @HttpCode(HttpStatus.OK)
   @ApiLogoutDoc()
   logout(): { message: string } {

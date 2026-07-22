@@ -1,5 +1,6 @@
 import { applyDecorators, HttpStatus } from '@nestjs/common';
-import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { LoginDto } from './dto/login.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 
 // Documentación de Swagger para el endpoint POST /auth/login
@@ -8,6 +9,15 @@ export function ApiLoginDoc() {
     ApiOperation({
       summary: 'Iniciar sesión',
       description: 'Autentica al usuario. Retorna un JWT de acceso.',
+    }),
+    ApiBody({
+      type: LoginDto,
+      examples: {
+        admin: {
+          summary: 'Credenciales de desarrollo',
+          value: { username: 'admin', password: 'admin123' },
+        },
+      },
     }),
     ApiResponse({
       status: HttpStatus.OK,

@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { DocumentBuilder, SwaggerModule, OpenAPIObject } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -46,7 +46,19 @@ async function bootstrap() {
     )
     .build();
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  const document: OpenAPIObject = SwaggerModule.createDocument(
+    app,
+    swaggerConfig,
+  );
+
+  // Seguridad global: todas las rutas requieren Bearer Token por defecto
+  document.security = [{ 'access-token': [] }];
+
+  // Excluir el endpoint público de login de la seguridad global
+  if (document.paths['/auth/login']?.post) {
+    document.paths['/auth/login'].post.security = [];
+  }
+
   SwaggerModule.setup('api', app, document, {
     jsonDocumentUrl: 'api-json',
     swaggerOptions: {

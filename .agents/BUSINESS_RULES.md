@@ -43,8 +43,8 @@ async checkOverdueInstallments() {
   // 1. Obtener grace_days de la configuración del admin
   // 2. Marcar cuotas vencidas: dueDate < (today - graceDays) AND status != PAID
   // 3. Calcular daysOverdue para cada cuota
-  // 4. Marcar clientes DELINQUENT si tienen cuotas OVERDUE
-  // 5. Quitar DELINQUENT a clientes que ya pagaron todas sus cuotas vencidas
+  // 4. Marcar clientes MOROSO si tienen cuotas OVERDUE
+  // 5. Quitar MOROSO a clientes que ya pagaron todas sus cuotas vencidas
   // 6. Loguear cuántas cuotas y clientes se actualizaron
 }
 ```
@@ -52,8 +52,8 @@ async checkOverdueInstallments() {
 **Reglas:**
 - Una cuota pasa a `OVERDUE` cuando: `dueDate < hoy - graceDays` Y estado != `PAID`
 - `daysOverdue` = diferencia en días entre hoy y `dueDate`
-- Un cliente pasa a `DELINQUENT` si tiene **al menos 1 cuota `OVERDUE`**
-- Un cliente vuelve a `CURRENT` automáticamente cuando no tiene cuotas `OVERDUE`
+- Un cliente pasa a `MOROSO` si tiene **al menos 1 cuota `OVERDUE`**
+- Un cliente vuelve a `AL_DIA` automáticamente cuando no tiene cuotas `OVERDUE`
 
 ---
 

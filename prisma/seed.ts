@@ -4,79 +4,152 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt';
 
-// ⚠️ CREDENCIALES DE DESARROLLO — Solo para seed inicial.
-// Cambiar la contraseña en producción vía endpoint o script separado.
-const SEED_USERNAME = 'admin';
-const SEED_PASSWORD = 'admin123';
-const BCRYPT_ROUNDS = 12; // Según CONVENTIONS.md
+const BCRYPT_ROUNDS = 12;
 
-// Configurar el pool de conexiones con pg
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-// Instanciar el adaptador para pg (requerido en Prisma v7)
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  console.log('🌱 Iniciando la siembra de la base de datos (seeding)...');
+  console.log('🌱 Seeding database...\n');
 
-  // 1. Hashear la contraseña en runtime (12 rounds según CONVENTIONS.md)
-  const passwordHash = await bcrypt.hash(SEED_PASSWORD, BCRYPT_ROUNDS);
+  // ─── Admins ──────────────────────────────────────────────────────────────
 
-  // 2. Crear usuario administrador inicial
-  const defaultAdmin = await prisma.user.upsert({
-    where: { username: SEED_USERNAME },
-    update: {
-      passwordHash, // Permite actualizar/restaurar la contraseña si se vuelve a correr el seed
-    },
+  const passwordHash = await bcrypt.hash('admin123', BCRYPT_ROUNDS);
+
+  const admin1 = await prisma.user.upsert({
+    where: { username: 'admin' },
+    update: { passwordHash },
     create: {
-      name: 'Administrador Principal',
-      username: SEED_USERNAME,
+      name: 'Admin Principal',
+      username: 'admin',
       passwordHash,
       role: 'admin',
       isActive: true,
     },
   });
+  console.log(`✅ Admin 1: "${admin1.username}" (${admin1.id})`);
 
-  console.log(
-    `✅ Usuario administrador creado o existente: "${defaultAdmin.username}"`,
-  );
-
-  // 3. Crear configuración de negocio inicial
-  await prisma.businessConfig.upsert({
-    where: { userId: defaultAdmin.id },
-    update: {},
+  const admin2 = await prisma.user.upsert({
+    where: { username: 'admin2' },
+    update: { passwordHash },
     create: {
-      userId: defaultAdmin.id,
-      businessName: 'PrestamosYA SRL',
-      primaryCurrency: 'BOB',
-      exchangeRate: 6.96,
-      defaultInterestRate: 10.0,
-      defaultPeriodType: 'daily',
-      graceDays: 2,
+      name: 'Admin Secundario',
+      username: 'admin2',
+      passwordHash,
+      role: 'admin',
+      isActive: true,
     },
   });
+  console.log(`✅ Admin 2: "${admin2.username}" (${admin2.id})`);
 
-  console.log(
-    `✅ Configuración de negocio inicial creada o existente para: "${defaultAdmin.name}"`,
-  );
-  console.log('🌱 Seeding finalizado con éxito.');
+  // ─── Business configs ────────────────────────────────────────────────────
+
+  for (const user of [admin1, admin2]) {
+    await prisma.businessConfig.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: {
+        userId: user.id,
+        businessName:
+          user.id === admin1.id ? 'PrestamosYA SRL' : 'Creditos Rápidos',
+        primaryCurrency: 'BOB',
+        exchangeRate: 6.96,
+        defaultInterestRate: 10.0,
+        defaultPeriodType: 'daily',
+        graceDays: 2,
+      },
+    });
+  }
+  console.log('✅ Business configs created for both admins');
+
+  // ─── Clients for Admin 1 (2 clients) ─────────────────────────────────────
+
+  const admin1Clients = [
+    {
+      fullName: 'Juan Pérez Mamani',
+      phone: '71234567',
+      idNumber: '1234567 LP',
+      phoneAlt: '60123456',
+      address: 'Av. 16 de Julio 1234, La Paz',
+      notes: 'Cliente frecuente, prefiere cobro por las mañanas.',
+    },
+    {
+      fullName: 'María Quispe Condori',
+      phone: '72223344',
+      idNumber: '7654321 LP',
+      phoneAlt: null,
+      address: 'Calle Comercio 567, El Alto',
+      notes: null,
+    },
+  ];
+
+  for (const data of admin1Clients) {
+    await prisma.client.upsert({
+      where: { idNumber: data.idNumber },
+      update: {},
+      create: {
+        userId: admin1.id,
+        fullName: data.fullName,
+        phone: data.phone,
+        idNumber: data.idNumber,
+        phoneAlt: data.phoneAlt,
+        address: data.address,
+        notes: data.notes,
+      },
+    });
+  }
+  console.log(`✅ ${admin1Clients.length} clients created for Admin 1`);
+
+  // ─── Clients for Admin 2 (1 client) ──────────────────────────────────────
+
+  const admin2Clients = [
+    {
+      fullName: 'Carlos García Choque',
+      phone: '73445566',
+      idNumber: '9876543 LP',
+      phoneAlt: null,
+      address: 'Av. Panorámica 890, La Paz',
+      notes: 'Nuevo cliente, referencia de Juan Pérez.',
+    },
+  ];
+
+  for (const data of admin2Clients) {
+    await prisma.client.upsert({
+      where: { idNumber: data.idNumber },
+      update: {},
+      create: {
+        userId: admin2.id,
+        fullName: data.fullName,
+        phone: data.phone,
+        idNumber: data.idNumber,
+        phoneAlt: data.phoneAlt,
+        address: data.address,
+        notes: data.notes,
+      },
+    });
+  }
+  console.log(`✅ ${admin2Clients.length} client created for Admin 2`);
+
+  // ─── Done ────────────────────────────────────────────────────────────────
+
+  console.log('\n🌱 Seeding completed successfully.');
   console.log('');
-  console.log('📋 Credenciales de desarrollo:');
-  console.log(`   Username: ${SEED_USERNAME}`);
-  console.log(`   Password: ${SEED_PASSWORD}`);
-  console.log('   ⚠️  Cambiar en producción.');
+  console.log('📋 Credentials:');
+  console.log('   Admin 1 — username: admin   / password: admin123');
+  console.log('   Admin 2 — username: admin2  / password: admin123');
+  console.log('   ⚠️  Change passwords in production.');
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Error durante el seeding de la base de datos:', e);
+    console.error('❌ Seeding failed:', e);
     process.exit(1);
   })
   .finally(async () => {
-    // Cerrar las conexiones de Prisma y pg pool
     await prisma.$disconnect();
     await pool.end();
   });

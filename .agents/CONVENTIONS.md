@@ -24,24 +24,35 @@ Un archivo por DTO. Usar decoradores de `class-validator` siempre.
 
 ```typescript
 export class CreateClientDto {
+  @ApiProperty({ default: 'María Quispe Mamani', maxLength: 150 })
   @IsString()
   @IsNotEmpty()
   @MaxLength(150)
   fullName: string;
 
+  @ApiProperty({ default: '71234567', maxLength: 20 })
   @IsString()
   @IsNotEmpty()
   idNumber: string;
 
+  @ApiProperty({ default: '5555555 LP', maxLength: 20 })
   @IsString()
-  @Matches(/^[67]\d{7}$/, { message: 'Teléfono boliviano inválido' })
+  @IsNotEmpty()
   phone: string;
 
+  @ApiPropertyOptional({ default: 'Av. Arce 123, La Paz' })
   @IsOptional()
-  @IsDecimal()
-  latitude?: number;
+  @IsString()
+  address?: string;
+
+  @ApiPropertyOptional({ default: 'Prefiere cobro por las mañanas.' })
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }
 ```
+
+Los decoradores `@ApiProperty` / `@ApiPropertyOptional` usan `default` (no `example`) para que Postman pre-cargue los valores al importar el OpenAPI JSON.
 
 ---
 
