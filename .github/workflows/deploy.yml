@@ -3,7 +3,7 @@ name: Deploy Prestamosya API (dev)
 on:
   push:
     branches:
-      - dev
+      - develop
 
 jobs:
   deploy:
@@ -25,8 +25,8 @@ jobs:
 
             echo "========== Actualizando código =========="
             cd /var/www/prestamosya/prestamosya-api
-            git fetch origin dev
-            git reset --hard origin/dev
+            git fetch origin develop
+            git reset --hard origin/develop
 
             echo "========== Instalando dependencias =========="
             pnpm install --frozen-lockfile
