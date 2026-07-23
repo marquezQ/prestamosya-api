@@ -1,0 +1,45 @@
+name: Deploy Prestamosya API (dev)
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy API en VPS
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+
+            echo "========== Verificando conexión =========="
+            whoami
+            hostname
+
+            echo "========== Actualizando código =========="
+            cd /var/www/prestamosya/prestamosya-api
+            git fetch origin dev
+            git reset --hard origin/dev
+
+            echo "========== Instalando dependencias =========="
+            pnpm install --frozen-lockfile
+
+            echo "========== Migraciones Prisma =========="
+            pnpm exec prisma migrate deploy
+            pnpm exec prisma generate
+
+            echo "========== Compilando =========="
+            pnpm run build
+
+            echo "========== Reiniciando PM2 =========="
+            pm2 restart prestamosya-api
+
+            echo "========== Estado PM2 =========="
+            pm2 ls

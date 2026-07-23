@@ -10,6 +10,9 @@ async function bootstrap() {
   // ─── Prefijo global de la API ────────────────────────────────────────────
   app.setGlobalPrefix('api');
 
+  // ─── CORS ─────────────────────────────────────────────────────────────────
+  app.enableCors();
+
   // ─── Validación global de DTOs ───────────────────────────────────────────
   // whitelist: strip propiedades no definidas en el DTO
   // forbidNonWhitelisted: lanza 400 si el cliente manda propiedades extras
