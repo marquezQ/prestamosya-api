@@ -30,13 +30,16 @@ Convenciones: columnas en `snake_case` en BD (gestionado con `@map` en Prisma), 
 
 ```prisma
 generator client {
-  provider = "prisma-client-js"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "commonjs"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
+
+> **Nota:** Este proyecto usa **Prisma v7**. El generador es `prisma-client` (no `prisma-client-js`) con `moduleFormat = "commonjs"` para que el cliente generado sea compatible con la compilación CommonJS de NestJS. La `url` de conexión no va en el `datasource`; se inyecta desde `prisma.config.ts` (`defineConfig({ datasource: { url: process.env['DATABASE_URL'] } })`). Ver `STACK.md` → "Configuración del sistema de módulos".
 
 // ─── ENUMS ───────────────────────────────────────────
 
