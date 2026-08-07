@@ -4,10 +4,14 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 
+/**
+ * Smoke test: verifica que el guard global protege la raíz por defecto.
+ * Sin el patrón @Public(), cualquier ruta sin token debe devolver 401.
+ */
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -16,10 +20,11 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
-  it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('/ (GET) exige autenticación', async () => {
+    await request(app.getHttpServer()).get('/').expect(401);
   });
 });

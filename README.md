@@ -85,3 +85,33 @@ Una vez iniciado el servidor, podrás acceder a:
 3. Esto creará una colección organizada automáticamente con los endpoints `login` y `me`.
 4. Ejecuta el request `POST /api/auth/login` para recibir tu `accessToken`.
 5. Edita la configuración de la colección o del request `GET /api/auth/me` para añadir una pestaña **"Authorization"** tipo **"Bearer Token"** con el token obtenido.
+
+---
+
+## Testing
+
+Estrategia completa y decisiones técnicas en [`.agents/TESTING.md`](./.agents/TESTING.md).
+
+### Unit tests (sin BD)
+```bash
+pnpm test
+pnpm test:cov   # con cobertura
+```
+
+### Tests E2E (requieren la BD de test)
+Los tests E2E arrancan la app real contra una **BD aislada** (`prestamosya_test`) para no ensuciar la de desarrollo.
+
+1. Crea la BD de test (una sola vez):
+   ```bash
+   PGPASSWORD=tu_password psql -h localhost -U postgres -c "CREATE DATABASE prestamosya_test;"
+   ```
+2. Define en `.env` (y copia a `.env.example`):
+   ```
+   TEST_DATABASE_URL="postgresql://usuario:password@localhost:5432/prestamosya_test"
+   ```
+3. Corre los E2E. El script `pretest:e2e` aplica migraciones y seed a la BD de test automáticamente:
+   ```bash
+   pnpm run test:e2e
+   ```
+
+> El acceso a la BD requiere que PostgreSQL local esté corriendo y que el usuario tenga permisos para crear la BD de test.
