@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaClientLike } from '../../../../common/types/prisma.types';
-import { PrismaService } from '../../../../prisma/prisma.service';
 import { InstallmentEntity } from '../../domain/entities/installment.entity';
 import { InstallmentRepository } from '../../domain/repositories/installment.repository';
 import { InstallmentMapper } from '../mappers/installment.mapper';
@@ -10,7 +9,7 @@ import { InstallmentMapper } from '../mappers/installment.mapper';
  */
 @Injectable()
 export class PrismaInstallmentRepository extends InstallmentRepository {
-  constructor(private readonly prisma: PrismaService | PrismaClientLike) {
+  constructor(private readonly prisma: PrismaClientLike) {
     super();
   }
 

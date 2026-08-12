@@ -4,11 +4,14 @@ import {
   IsArray,
   IsDateString,
   IsEnum,
+  IsIn,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -57,21 +60,32 @@ export class CreateLoanDto {
   @IsEnum(LoanMode)
   mode: LoanMode;
 
-  @ApiProperty({ default: 1000, description: 'Monto del capital prestado' })
-  @IsNumber()
+  @ApiProperty({
+    default: 1000,
+    description: 'Monto del capital prestado en la moneda indicada',
+  })
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.01)
+  @Max(9_999_999.99)
   capitalAmount: number;
 
-  @ApiProperty({ default: 'BOB', description: 'Moneda: BOB o USD' })
+  @ApiProperty({
+    default: 'BOB',
+    description: 'Moneda del préstamo',
+    enum: ['BOB', 'USD'],
+  })
   @IsString()
+  @IsNotEmpty()
+  @IsIn(['BOB', 'USD'])
   currency: Currency;
 
   @ApiProperty({
     default: 10,
-    description: 'Tasa de interés por período (ej. 10 para 10%)',
+    description: 'Tasa de interés por período (ej. 10 para 10%). Máximo 100.',
   })
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 4 })
   @Min(0)
+  @Max(100)
   interestRate: number;
 
   @ApiPropertyOptional({ enum: PeriodType, default: PeriodType.MONTHLY })
@@ -79,9 +93,13 @@ export class CreateLoanDto {
   @IsEnum(PeriodType)
   periodType?: PeriodType;
 
-  @ApiProperty({ default: 3, description: 'Número total de cuotas' })
-  @IsNumber()
+  @ApiProperty({
+    default: 3,
+    description: 'Número total de cuotas. Debe ser un entero >= 1.',
+  })
+  @IsInt()
   @Min(1)
+  @Max(360)
   totalInstallments: number;
 
   @ApiProperty({

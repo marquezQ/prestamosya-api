@@ -5,6 +5,9 @@ Prefijo global: `/api`. Documentación interactiva disponible en `/api` (Swagger
 
 Todas las rutas requieren `Authorization: Bearer <access_token>` excepto las marcadas como públicas.
 
+> [!WARNING]
+> **Importación en Postman:** La API define su seguridad de forma global (`document.security` en `main.ts`). **NO usar `@ApiBearerAuth()` en los controladores**, ya que esto obliga a Swagger a colocar el esquema de seguridad a nivel de ruta individual, lo cual rompe la herencia de tokens a nivel de carpeta cuando se importa en Postman.
+
 ---
 
 ## Auth (público / protegido)

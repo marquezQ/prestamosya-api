@@ -115,6 +115,19 @@ Ejemplo: Bs 1.000 al 10% mensual × 3 cuotas
 - Validar que `SUM(installment.totalAmount) >= loan.capitalAmount`
 - No calcular nada — solo persistir lo que el admin definió
 
+### Flujo de Integración Frontend ↔ Backend (React Native)
+
+Para la creación de préstamos (formulario de 3 pasos) el frontend DEBE respetar este flujo usando un manejador de estado (ej. Zustand):
+
+1. **Paso de Simulación**: El frontend envía los parámetros a `POST /api/loans/simulate`. El backend retorna el cronograma proyectado (sin persistir nada).
+2. **Paso de Revisión (Zustand)**: El frontend almacena esta simulación en memoria y la muestra al admin.
+3. **Paso de Creación**:
+   - **Camino Automático:** Si el admin acepta la tabla generada sin hacer ningún cambio, el frontend hace `POST /api/loans` mandando `mode: "AUTOMATIC"` junto a los parámetros básicos originales. **NO debe** enviar la lista de cuotas. El backend recalculará todo de forma idéntica.
+   - **Camino Manual:** Si el admin ajustó alguna fecha o monto en la tabla, el frontend hace `POST /api/loans` mandando `mode: "MANUAL"` **junto al arreglo completo modificado** dentro de la propiedad `manualInstallments`.
+   
+> [!IMPORTANT]
+> El frontend está estrictamente obligado a mandar el `mode` (`AUTOMATIC` o `MANUAL`). Si se manda `MANUAL` sin el arreglo de cuotas, el sistema arrojará un Bad Request. Si se manda `AUTOMATIC`, el sistema ignorará por completo cualquier arreglo que se envíe e impondrá el cálculo oficial del sistema.
+
 ### Reglas de redondeo
 
 - Todos los montos: `Decimal` con **2 decimales**

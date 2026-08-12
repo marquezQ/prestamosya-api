@@ -266,6 +266,12 @@ export class PrismaLoanRepository implements LoanRepository {
 
 **Inyección de dependencias en loans.module.ts:**
 
+> [!WARNING]
+> **Bug de DI con TypeScript y NestJS:**
+> Los repositorios de infraestructura usan `PrismaClientLike` (un type alias) en su constructor en lugar de `PrismaService`, para poder ser instanciados tanto por Nest (con el service global) como por el UnitOfWork (con el `tx` transaccional).
+> Sin embargo, TypeScript emite metadatos (`reflect-metadata`) para los alias como `Object`. Esto causa que NestJS lance `UnknownDependenciesException` al usar `useClass`. 
+> **Solución:** Siempre debes usar `useFactory` e inyectar explícitamente el `PrismaService` cuando registres estos repositorios en el módulo.
+
 ```typescript
 @Module({
   providers: [
@@ -275,7 +281,8 @@ export class PrismaLoanRepository implements LoanRepository {
     CalculateInstallmentsUseCase,
     {
       provide: LoanRepository,         // ← token = interfaz
-      useClass: PrismaLoanRepository,  // ← implementación concreta
+      useFactory: (prisma: PrismaService) => new PrismaLoanRepository(prisma),
+      inject: [PrismaService],         // ← inyección manual segura
     },
   ],
   controllers: [LoansController],

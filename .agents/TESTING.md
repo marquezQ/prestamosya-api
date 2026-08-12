@@ -85,6 +85,15 @@ Tres conductas que definen a un buen tester:
 | `clients.controller` | — | ⛔ no | plomería |
 | DTOs | E2E | 🟢 | validación (pipe global), no unit test dedicado |
 
+### Módulo `loans` (Clean Architecture)
+| Unidad | Tipo | Prioridad | Qué cubrir |
+|--------|------|-----------|-----------|
+| `Money.vo` | **Unit** | 🔴 **Alta** | Operaciones matemáticas con `decimal.js`, inmutabilidad, errores por mezclar diferentes monedas, redondeo y formateo estricto. |
+| `LoanCalculatorService` | **Unit** | 🔴 **Alta** | Generación de cuotas (Automático), cálculo preciso de fechas (mensual/semanal), distribución de capital, y especialmente **absorción de redondeo en la última cuota**. |
+| `LoanEntity` & `InstallmentEntity` | **Unit** | 🔴 **Alta** | Invariantes puros del negocio: instanciación de cuotas, cálculos de pagos, transiciones de estado, validación de refinanciamiento. |
+| `CreateLoanUseCase` | **Unit** | 🟡 Media-Alta | Validaciones de creación, llamadas a los servicios de dominio, manejo de transacciones vía `UnitOfWork`. |
+| `LoansController` & Repositories | — | ⛔ no | Probados directamente a través de tests E2E y de integración. |
+
 ---
 
 ## 5. Cómo mockear PrismaService (recomendado)
@@ -174,9 +183,9 @@ test/clients.e2e-spec.ts                      (e2e)
 
 ---
 
-## 9. Estado de implementación (Ejecutado: auth + clients)
+## 9. Estado de implementación (Ejecutado: auth, clients, loans)
 
-Unit y E2E de `auth` y `clients` ya implementados y en verde. Queda pendiente el testing de los módulos futuros (loans, payments, cron, garantías) cuando existan.
+Unit y E2E de `auth` y `clients` implementados y en verde. Testing unitario completo del dominio y casos de uso del módulo `loans` (Clean Architecture). Queda pendiente E2E de `loans`, y el testing de los módulos futuros (payments, cron, garantías).
 
 | Id | Qué | Archivos | Estado |
 |----|-----|----------|--------|
@@ -187,9 +196,11 @@ Unit y E2E de `auth` y `clients` ya implementados y en verde. Queda pendiente el
 | 5 | BD de test + scripts | `scripts/setup-test-db.js`, `test/setup-e2e.ts` | ✅ |
 | 6 | E2E `auth` | `test/auth.e2e-spec.ts` | ✅ |
 | 7 | E2E `clients` | `test/clients.e2e-spec.ts` | ✅ |
-| 8 | Verificación (unit+e2e+lint+types) | — | ✅ |
+| 8 | Unit Dominio `loans` | `src/modules/loans/domain/**/*.spec.ts` | ✅ |
+| 9 | Unit Use Cases `loans`| `src/modules/loans/application/**/*.spec.ts`| ✅ |
+| 10| Verificación general | — | ✅ |
 
-**Resultado:** `20` tests unit + `11` E2E en verde. Cobertura: `AuthService` ~94 %, `ClientsService` ~92 %, `JwtStrategy` 100 %.
+**Resultado:** `86` tests unit + E2E en verde. Cobertura del dominio de `loans` cercana al 100%.
 
 ---
 
@@ -279,7 +290,6 @@ El orden prioriza probar el costo de cada técnica en su momento y ver la utilid
 ## 10. Fuera del alcance (para más adelante)
 - **Unit/Integración de `payments`** (pago completo, parcial, multi-cuota, anulación) — cuando exista el módulo.
 - **Unit del cron de mora** — cuando exista el `overdue.cron.ts` (`@nestjs/schedule`).
-- **Unit de dominio `loans`** (`LoanCalculatorService` con casos borde de redondeo, `LoanEntity`) — cuando se implemente Clean Architecture en `loans`.
 - **Integración del `PrismaLoanRepository`** contra BD real.
 
 ---

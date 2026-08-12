@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaClientLike } from '../../../../common/types/prisma.types';
-import { PrismaService } from '../../../../prisma/prisma.service';
 import { InstallmentEntity } from '../../domain/entities/installment.entity';
 import { LoanEntity } from '../../domain/entities/loan.entity';
 import { LoanRepository } from '../../domain/repositories/loan.repository';
@@ -11,7 +10,7 @@ import { LoanMapper } from '../mappers/loan.mapper';
  */
 @Injectable()
 export class PrismaLoanRepository extends LoanRepository {
-  constructor(private readonly prisma: PrismaService | PrismaClientLike) {
+  constructor(private readonly prisma: PrismaClientLike) {
     super();
   }
 
