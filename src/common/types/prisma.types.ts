@@ -12,3 +12,5 @@ export type PrismaTransactionClient = Omit<
   PrismaClient,
   '$connect' | '$disconnect' | '$transaction' | '$extends' | '$on'
 >;
+
+export type PrismaClientLike = PrismaTransactionClient;
