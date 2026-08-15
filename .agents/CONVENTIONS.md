@@ -22,6 +22,12 @@ El agente debe seguir estas convenciones en **todo código que genere**.
 
 Un archivo por DTO. Usar decoradores de `class-validator` siempre.
 
+**Reglas Críticas de Validación:**
+- Usar `@IsInt()` en lugar de `@IsNumber()` para campos enteros (ej. número de cuotas).
+- Usar `@IsIn(['A', 'B'])` además de `@IsString()` para valores literales restringidos (ej. monedas).
+- Siempre delimitar números con `@Min()` y `@Max()` para evitar edge-cases matemáticos.
+- Usar `@IsNotEmpty()` en strings obligatorios, ya que `@IsString()` acepta strings vacíos `""`.
+
 ```typescript
 export class CreateClientDto {
   @ApiProperty({ default: 'María Quispe Mamani', maxLength: 150 })
@@ -73,7 +79,7 @@ El `HttpExceptionFilter` está registrado globalmente en `main.ts`. No manejar e
 ## Seguridad
 
 - Todas las rutas protegidas con `JwtAuthGuard` excepto `/api/auth/login` y `/health`
-- Decorator `@CurrentUser()` para acceder al usuario autenticado en cualquier controller
+- Decorator `@CurrentUser() user: JwtPayload` para acceder al usuario. El ID del usuario está en **`user.sub`** (NO usar `@CurrentUser('id')` ya que el payload no tiene esa propiedad).
 - Validar que el recurso pertenece al usuario antes de operar — un admin no puede ver datos de otro admin
 - Rate limiting en `POST /api/auth/login`: máximo 5 intentos fallidos por IP en 15 minutos
 - Helmet configurado en `main.ts`
@@ -124,3 +130,10 @@ refactor(auth): extraer lógica de hash a método privado
 ```
 
 Tipos permitidos: `feat`, `fix`, `test`, `chore`, `refactor`, `docs`, `perf`
+
+---
+
+## Documentación API (Swagger / Postman)
+
+- **Postman y Herencia de Auth**: Dado que la seguridad (Bearer Token) está configurada globalmente en `main.ts` (`document.security`), **NUNCA** debes agregar el decorador `@ApiBearerAuth('access-token')` a nivel de controller ni método. 
+- Si agregas `@ApiBearerAuth`, Swagger coloca el esquema de seguridad directamente sobre ese endpoint. Cuando se exporta el JSON a Postman, Postman asigna la seguridad manual a esa petición, **rompiendo la herencia de la carpeta padre**. Al omitirlo, todas las rutas heredan limpiamente el token de la colección padre.
