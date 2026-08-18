@@ -100,7 +100,24 @@ export function ApiSimulateLoanDoc() {
       description:
         'Genera y devuelve el cronograma de pagos calculado sin guardar nada en base de datos. Ideal para vista previa antes de crear el préstamo.',
     }),
-    ApiBody({ type: SimulateLoanDto }),
+    ApiBody({
+      type: SimulateLoanDto,
+      examples: {
+        automatic: {
+          summary: 'Simulación Mensual',
+          description:
+            'Calcula el cronograma de cuotas sin persistir. La primera cuota vence en startDate + 1 mes.',
+          value: {
+            capitalAmount: 1000,
+            currency: 'BOB',
+            interestRate: 10,
+            periodType: 'monthly',
+            totalInstallments: 3,
+            startDate: '2026-08-15',
+          },
+        },
+      },
+    }),
     ApiResponse({
       status: HttpStatus.OK,
       description: 'Simulación exitosa',

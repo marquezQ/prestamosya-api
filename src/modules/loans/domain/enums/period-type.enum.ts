@@ -6,6 +6,7 @@
 export enum PeriodType {
   DAILY = 'daily',
   WEEKLY = 'weekly',
+  FORTNIGHTLY = 'fortnightly',
   MONTHLY = 'monthly',
   CUSTOM = 'custom',
 }

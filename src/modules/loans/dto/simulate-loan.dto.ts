@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import {
   IsDateString,
   IsEnum,
@@ -6,7 +6,6 @@ import {
   IsInt,
   IsNotEmpty,
   IsNumber,
-  IsOptional,
   IsString,
   Max,
   Min,
@@ -62,13 +61,4 @@ export class SimulateLoanDto {
   })
   @IsDateString()
   startDate: string;
-
-  @ApiPropertyOptional({
-    default: '2026-09-15',
-    description:
-      'Fecha de vencimiento de la primera cuota (YYYY-MM-DD). Si no se envía, se calcula automáticamente como startDate + 1 período.',
-  })
-  @IsOptional()
-  @IsDateString()
-  firstDueDate?: string;
 }

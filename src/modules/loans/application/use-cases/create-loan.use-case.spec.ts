@@ -84,7 +84,6 @@ describe('CreateLoanUseCase', () => {
       periodType: PeriodType.MONTHLY,
       totalInstallments: 3,
       startDate: '2026-08-15',
-      firstDueDate: '2026-09-15',
     };
 
     const result = await useCase.execute('user-1', dto);
@@ -94,6 +93,8 @@ describe('CreateLoanUseCase', () => {
     expect(result.capitalAmount.toNumber()).toBe(1000);
     expect(result.totalAmount.toNumber()).toBe(1300);
     expect(result.installments).toHaveLength(3);
+    // firstDueDate se calcula: startDate (2026-08-15) + 1 mes = 2026-09-15
+    expect(result.firstDueDate.toISOString().split('T')[0]).toBe('2026-09-15');
 
     expect(mockPrismaService.client.findFirst).toHaveBeenCalledWith({
       where: { id: 'client-1', userId: 'user-1', deletedAt: null },
@@ -119,7 +120,6 @@ describe('CreateLoanUseCase', () => {
       periodType: PeriodType.MONTHLY,
       totalInstallments: 3,
       startDate: '2026-08-15',
-      firstDueDate: '2026-09-15',
     };
 
     await expect(useCase.execute('user-1', dto)).rejects.toThrow(
@@ -142,7 +142,6 @@ describe('CreateLoanUseCase', () => {
       interestRate: 10,
       totalInstallments: 3,
       startDate: '2026-08-15',
-      firstDueDate: '2026-09-15',
     };
 
     await expect(useCase.execute('user-1', dto)).rejects.toThrow(
@@ -165,7 +164,6 @@ describe('CreateLoanUseCase', () => {
       interestRate: 0,
       totalInstallments: 2,
       startDate: '2026-08-15',
-      firstDueDate: '2026-09-15',
       manualInstallments: [
         {
           installmentNumber: 1,
@@ -189,6 +187,8 @@ describe('CreateLoanUseCase', () => {
     expect(result).toBeDefined();
     expect(result.totalAmount.toNumber()).toBe(1100);
     expect(result.installments).toHaveLength(2);
+    // firstDueDate se toma de la primera cuota manual
+    expect(result.firstDueDate.toISOString().split('T')[0]).toBe('2026-09-15');
     expect(mockLoanRepository.save).toHaveBeenCalled();
   });
 
@@ -207,7 +207,6 @@ describe('CreateLoanUseCase', () => {
       interestRate: 0,
       totalInstallments: 2,
       startDate: '2026-08-15',
-      firstDueDate: '2026-09-15',
       manualInstallments: [
         {
           installmentNumber: 1,
@@ -231,7 +230,7 @@ describe('CreateLoanUseCase', () => {
     );
   });
 
-  it('should auto-calculate firstDueDate from startDate when not provided (automatic mode)', async () => {
+  it('should auto-calculate firstDueDate from startDate in automatic mode', async () => {
     mockPrismaService.client.findFirst.mockResolvedValue({
       id: 'client-1',
       userId: 'user-1',
@@ -260,7 +259,7 @@ describe('CreateLoanUseCase', () => {
     );
   });
 
-  it('should auto-calculate firstDueDate from first manual installment when not provided', async () => {
+  it('should auto-calculate firstDueDate from first manual installment', async () => {
     mockPrismaService.client.findFirst.mockResolvedValue({
       id: 'client-1',
       userId: 'user-1',

@@ -249,6 +249,7 @@ enum Currency {
 enum PeriodType {
   daily
   weekly
+  fortnightly
   monthly
   custom
 }
