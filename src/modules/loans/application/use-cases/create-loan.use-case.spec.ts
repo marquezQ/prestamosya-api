@@ -230,4 +230,72 @@ describe('CreateLoanUseCase', () => {
       InvalidInstallmentsError,
     );
   });
+
+  it('should auto-calculate firstDueDate from startDate when not provided (automatic mode)', async () => {
+    mockPrismaService.client.findFirst.mockResolvedValue({
+      id: 'client-1',
+      userId: 'user-1',
+      status: 'NO_LOAN',
+    });
+
+    const dto: CreateLoanDto = {
+      clientId: 'client-1',
+      mode: LoanMode.AUTOMATIC,
+      capitalAmount: 1000,
+      currency: 'BOB',
+      interestRate: 10,
+      periodType: PeriodType.MONTHLY,
+      totalInstallments: 3,
+      startDate: '2026-08-15',
+    };
+
+    const result = await useCase.execute('user-1', dto);
+
+    expect(result).toBeDefined();
+    expect(result.status).toBe(LoanStatus.ACTIVE);
+    expect(result.installments).toHaveLength(3);
+    expect(result.firstDueDate.toISOString().split('T')[0]).toBe('2026-09-15');
+    expect(result.installments[0].dueDate.toISOString().split('T')[0]).toBe(
+      '2026-09-15',
+    );
+  });
+
+  it('should auto-calculate firstDueDate from first manual installment when not provided', async () => {
+    mockPrismaService.client.findFirst.mockResolvedValue({
+      id: 'client-1',
+      userId: 'user-1',
+      status: 'CURRENT',
+    });
+
+    const dto: CreateLoanDto = {
+      clientId: 'client-1',
+      mode: LoanMode.MANUAL,
+      capitalAmount: 1000,
+      currency: 'BOB',
+      interestRate: 0,
+      totalInstallments: 2,
+      startDate: '2026-08-15',
+      manualInstallments: [
+        {
+          installmentNumber: 1,
+          dueDate: '2026-09-20',
+          capitalAmount: 500,
+          interestAmount: 50,
+          totalAmount: 550,
+        },
+        {
+          installmentNumber: 2,
+          dueDate: '2026-10-20',
+          capitalAmount: 500,
+          interestAmount: 50,
+          totalAmount: 550,
+        },
+      ],
+    };
+
+    const result = await useCase.execute('user-1', dto);
+
+    expect(result).toBeDefined();
+    expect(result.firstDueDate.toISOString().split('T')[0]).toBe('2026-09-20');
+  });
 });

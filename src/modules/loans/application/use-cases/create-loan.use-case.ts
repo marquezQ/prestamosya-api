@@ -41,7 +41,9 @@ export class CreateLoanUseCase {
     const capital = Money.of(dto.capitalAmount, currency);
     const interestRate = new Decimal(dto.interestRate);
     const startDate = new Date(dto.startDate);
-    const firstDueDate = new Date(dto.firstDueDate);
+    const firstDueDate = dto.firstDueDate
+      ? new Date(dto.firstDueDate)
+      : undefined;
 
     let installments: InstallmentEntity[];
     let totalAmount: Money;
@@ -58,6 +60,7 @@ export class CreateLoanUseCase {
         interestRate,
         totalInstallments: dto.totalInstallments,
         firstDueDate,
+        startDate,
         periodType: dto.periodType,
       });
 
@@ -107,6 +110,16 @@ export class CreateLoanUseCase {
       }
     }
 
+    // Resolver firstDueDate para almacenar en el Loan:
+    // - Si vino en el DTO, se usa tal cual
+    // - En modo AUTOMATIC, el calculator ya la resolvió internamente
+    // - En modo MANUAL, se toma de la primera cuota manual
+    const resolvedFirstDueDate =
+      firstDueDate ??
+      (dto.mode === LoanMode.AUTOMATIC
+        ? this.calculator.calculateDueDate(startDate, dto.periodType!, 1)
+        : installments[0].dueDate);
+
     // 2. Construir la entidad LoanEntity en estado ACTIVE
     const loanEntity = new LoanEntity(
       null, // id (asignado por BD)
@@ -122,7 +135,7 @@ export class CreateLoanUseCase {
       totalAmount, // outstandingBalance
       LoanStatus.ACTIVE,
       startDate,
-      firstDueDate,
+      resolvedFirstDueDate,
       dto.notes ?? null,
       installments,
     );

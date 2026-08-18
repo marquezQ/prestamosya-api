@@ -5,12 +5,17 @@ import { Money } from '../value-objects/money.vo';
 
 /**
  * Parámetros de entrada para el cálculo de cuotas en modo automático.
+ *
+ * `firstDueDate` es la fecha de vencimiento de la primera cuota.
+ * Si no se provee, se calcula automáticamente como `startDate + 1 período`.
+ * Se requiere al menos uno de los dos.
  */
 export interface CalculateInstallmentsParams {
   capital: Money;
   interestRate: Decimal;
   totalInstallments: number;
-  firstDueDate: Date;
+  firstDueDate?: Date;
+  startDate?: Date;
   periodType: PeriodType;
 }
 
@@ -50,13 +55,19 @@ export class LoanCalculatorService {
   calculateInstallments(
     params: CalculateInstallmentsParams,
   ): CalculateInstallmentsResult {
-    const {
-      capital,
-      interestRate,
-      totalInstallments,
-      firstDueDate,
-      periodType,
-    } = params;
+    const { capital, interestRate, totalInstallments, periodType } = params;
+
+    let firstDueDate = params.firstDueDate;
+
+    if (!firstDueDate) {
+      if (!params.startDate) {
+        throw new Error(
+          'Se requiere firstDueDate o startDate para calcular las fechas de cuotas',
+        );
+      }
+      firstDueDate = this.calculateDueDate(params.startDate, periodType, 1);
+    }
+
     const currency = capital.currency;
 
     // Tasa por período como decimal: 10% -> 0.10

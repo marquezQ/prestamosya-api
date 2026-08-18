@@ -27,7 +27,6 @@ export function ApiCreateLoanDoc() {
             periodType: 'monthly',
             totalInstallments: 3,
             startDate: '2026-08-15',
-            firstDueDate: '2026-09-15',
             notes: 'Préstamo personal para mercadería',
           },
         },
@@ -44,7 +43,6 @@ export function ApiCreateLoanDoc() {
             periodType: 'monthly',
             totalInstallments: 3,
             startDate: '2026-08-15',
-            firstDueDate: '2026-09-15',
             notes: 'Préstamo manual',
             manualInstallments: [
               {

@@ -109,12 +109,14 @@ export class CreateLoanDto {
   @IsDateString()
   startDate: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     default: '2026-09-15',
-    description: 'Fecha de vencimiento de la primera cuota (YYYY-MM-DD)',
+    description:
+      'Fecha de vencimiento de la primera cuota (YYYY-MM-DD). Si no se envía, se calcula automáticamente como startDate + 1 período.',
   })
+  @IsOptional()
   @IsDateString()
-  firstDueDate: string;
+  firstDueDate?: string;
 
   @ApiPropertyOptional({ default: 'Préstamo personal para mercadería' })
   @IsOptional()

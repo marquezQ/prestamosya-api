@@ -200,4 +200,114 @@ describe('LoanCalculatorService', () => {
       expect(offset3.toISOString().split('T')[0]).toBe('2026-12-01');
     });
   });
+
+  describe('calculateInstallments() with auto-calculated firstDueDate', () => {
+    it('should auto-calculate firstDueDate as startDate + 1 month when firstDueDate is omitted', () => {
+      const capital = Money.of(1000, 'BOB');
+      const interestRate = new Decimal(10);
+      const startDate = new Date('2026-08-15T00:00:00.000Z');
+
+      const result = calculator.calculateInstallments({
+        capital,
+        interestRate,
+        totalInstallments: 3,
+        startDate,
+        periodType: PeriodType.MONTHLY,
+      });
+
+      expect(result.installments).toHaveLength(3);
+      // firstDueDate = startDate (2026-08-15) + 1 mes = 2026-09-15
+      expect(result.installments[0].dueDate.toISOString().split('T')[0]).toBe(
+        '2026-09-15',
+      );
+      expect(result.installments[1].dueDate.toISOString().split('T')[0]).toBe(
+        '2026-10-15',
+      );
+      expect(result.installments[2].dueDate.toISOString().split('T')[0]).toBe(
+        '2026-11-15',
+      );
+    });
+
+    it('should auto-calculate firstDueDate as startDate + 7 days for WEEKLY', () => {
+      const capital = Money.of(500, 'BOB');
+      const interestRate = new Decimal(5);
+      const startDate = new Date('2026-09-01T00:00:00.000Z');
+
+      const result = calculator.calculateInstallments({
+        capital,
+        interestRate,
+        totalInstallments: 2,
+        startDate,
+        periodType: PeriodType.WEEKLY,
+      });
+
+      // firstDueDate = 2026-09-01 + 7 días = 2026-09-08
+      expect(result.installments[0].dueDate.toISOString().split('T')[0]).toBe(
+        '2026-09-08',
+      );
+      expect(result.installments[1].dueDate.toISOString().split('T')[0]).toBe(
+        '2026-09-15',
+      );
+    });
+
+    it('should auto-calculate firstDueDate as startDate + 1 day for DAILY', () => {
+      const capital = Money.of(100, 'BOB');
+      const interestRate = new Decimal(2);
+      const startDate = new Date('2026-09-01T00:00:00.000Z');
+
+      const result = calculator.calculateInstallments({
+        capital,
+        interestRate,
+        totalInstallments: 2,
+        startDate,
+        periodType: PeriodType.DAILY,
+      });
+
+      // firstDueDate = 2026-09-01 + 1 día = 2026-09-02
+      expect(result.installments[0].dueDate.toISOString().split('T')[0]).toBe(
+        '2026-09-02',
+      );
+      expect(result.installments[1].dueDate.toISOString().split('T')[0]).toBe(
+        '2026-09-03',
+      );
+    });
+
+    it('should throw when neither firstDueDate nor startDate is provided', () => {
+      const capital = Money.of(1000, 'BOB');
+      const interestRate = new Decimal(10);
+
+      expect(() =>
+        calculator.calculateInstallments({
+          capital,
+          interestRate,
+          totalInstallments: 3,
+          periodType: PeriodType.MONTHLY,
+        }),
+      ).toThrow('Se requiere firstDueDate o startDate');
+    });
+
+    it('should prefer firstDueDate over startDate when both are provided', () => {
+      const capital = Money.of(1000, 'BOB');
+      const interestRate = new Decimal(10);
+      const startDate = new Date('2026-08-15T00:00:00.000Z');
+      const firstDueDate = new Date('2026-12-01T00:00:00.000Z');
+
+      const result = calculator.calculateInstallments({
+        capital,
+        interestRate,
+        totalInstallments: 2,
+        startDate,
+        firstDueDate,
+        periodType: PeriodType.MONTHLY,
+      });
+
+      // Se usa firstDueDate explícita, no startDate
+      expect(result.installments[0].dueDate.toISOString().split('T')[0]).toBe(
+        '2026-12-01',
+      );
+      expect(result.installments[1].dueDate.toISOString().split('T')[0]).toBe(
+        '2027-01-01',
+      );
+    });
+  });
 });
