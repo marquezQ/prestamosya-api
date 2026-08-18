@@ -6,10 +6,17 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { LoansModule } from './modules/loans/loans.module';
+import { GuaranteesModule } from './modules/guarantees/guarantees.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, ClientsModule, LoansModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    ClientsModule,
+    LoansModule,
+    GuaranteesModule,
+  ],
   controllers: [AppController],
   providers: [
     AppService,
