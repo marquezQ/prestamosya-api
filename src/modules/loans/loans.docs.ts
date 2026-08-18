@@ -3,6 +3,7 @@ import { ApiBody, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { CreateLoanDto } from './dto/create-loan.dto';
 import { LoanResponseDto } from './dto/loan-response.dto';
 import { SimulateLoanDto } from './dto/simulate-loan.dto';
+import { LinkGuaranteeDto } from './dto/link-guarantee.dto';
 
 export function ApiCreateLoanDoc() {
   return applyDecorators(
@@ -27,7 +28,6 @@ export function ApiCreateLoanDoc() {
             periodType: 'monthly',
             totalInstallments: 3,
             startDate: '2026-08-15',
-            firstDueDate: '2026-09-15',
             notes: 'Préstamo personal para mercadería',
           },
         },
@@ -44,7 +44,6 @@ export function ApiCreateLoanDoc() {
             periodType: 'monthly',
             totalInstallments: 3,
             startDate: '2026-08-15',
-            firstDueDate: '2026-09-15',
             notes: 'Préstamo manual',
             manualInstallments: [
               {
@@ -101,7 +100,24 @@ export function ApiSimulateLoanDoc() {
       description:
         'Genera y devuelve el cronograma de pagos calculado sin guardar nada en base de datos. Ideal para vista previa antes de crear el préstamo.',
     }),
-    ApiBody({ type: SimulateLoanDto }),
+    ApiBody({
+      type: SimulateLoanDto,
+      examples: {
+        automatic: {
+          summary: 'Simulación Mensual',
+          description:
+            'Calcula el cronograma de cuotas sin persistir. La primera cuota vence en startDate + 1 mes.',
+          value: {
+            capitalAmount: 1000,
+            currency: 'BOB',
+            interestRate: 10,
+            periodType: 'monthly',
+            totalInstallments: 3,
+            startDate: '2026-08-15',
+          },
+        },
+      },
+    }),
     ApiResponse({
       status: HttpStatus.OK,
       description: 'Simulación exitosa',
@@ -113,6 +129,92 @@ export function ApiSimulateLoanDoc() {
     ApiResponse({
       status: HttpStatus.UNAUTHORIZED,
       description: 'No autorizado. Requiere Bearer Token JWT.',
+    }),
+  );
+}
+
+export function ApiLinkGuaranteeDoc() {
+  return applyDecorators(
+    ApiOperation({
+      summary: 'Vincular una garantía a un préstamo',
+      description:
+        'Vincular una garantía disponible del cliente a un préstamo activo.',
+    }),
+    ApiBody({
+      type: LinkGuaranteeDto,
+      examples: {
+        ejemplo: {
+          summary: 'Vincular Garantía por ID',
+          value: {
+            guaranteeId: '72ab723b-682c-4221-85f8-2d57db00b364',
+          },
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.CREATED,
+      description: 'Garantía vinculada exitosamente.',
+    }),
+    ApiResponse({
+      status: HttpStatus.BAD_REQUEST,
+      description:
+        'La garantía ya está en uso (IN_USE) o no pertenece al cliente.',
+    }),
+    ApiResponse({
+      status: HttpStatus.NOT_FOUND,
+      description: 'Préstamo o garantía no encontrada.',
+    }),
+  );
+}
+
+export function ApiUnlinkGuaranteeDoc() {
+  return applyDecorators(
+    ApiOperation({
+      summary: 'Desvincular una garantía de un préstamo',
+      description:
+        'Desvincula la garantía y la vuelve a marcar como disponible (AVAILABLE).',
+    }),
+    ApiResponse({
+      status: HttpStatus.OK,
+      description: 'Garantía desvinculada exitosamente.',
+    }),
+    ApiResponse({
+      status: HttpStatus.NOT_FOUND,
+      description: 'Vinculación activa no encontrada.',
+    }),
+  );
+}
+
+export function ApiGetLoanDetailDoc() {
+  return applyDecorators(
+    ApiOperation({
+      summary: 'Obtener el detalle completo de un préstamo',
+      description:
+        'Devuelve la cabecera del préstamo, cuotas, garantías vinculadas y pagos.',
+    }),
+    ApiResponse({
+      status: HttpStatus.OK,
+      description: 'Detalle del préstamo.',
+    }),
+    ApiResponse({
+      status: HttpStatus.NOT_FOUND,
+      description: 'Préstamo no encontrado.',
+    }),
+  );
+}
+
+export function ApiGetLoanInstallmentsDoc() {
+  return applyDecorators(
+    ApiOperation({
+      summary: 'Obtener únicamente las cuotas de un préstamo',
+    }),
+    ApiResponse({
+      status: HttpStatus.OK,
+      description: 'Lista de cuotas activas.',
+    }),
+    ApiResponse({
+      status: HttpStatus.NOT_FOUND,
+      description: 'Préstamo no encontrado.',
     }),
   );
 }

@@ -5,12 +5,16 @@ import { Money } from '../value-objects/money.vo';
 
 /**
  * Parámetros de entrada para el cálculo de cuotas en modo automático.
+ *
+ * `startDate` es la fecha de desembolso del préstamo.
+ * La fecha de vencimiento de la primera cuota se calcula
+ * automáticamente como `startDate + 1 período`.
  */
 export interface CalculateInstallmentsParams {
   capital: Money;
   interestRate: Decimal;
   totalInstallments: number;
-  firstDueDate: Date;
+  startDate: Date;
   periodType: PeriodType;
 }
 
@@ -50,13 +54,10 @@ export class LoanCalculatorService {
   calculateInstallments(
     params: CalculateInstallmentsParams,
   ): CalculateInstallmentsResult {
-    const {
-      capital,
-      interestRate,
-      totalInstallments,
-      firstDueDate,
-      periodType,
-    } = params;
+    const { capital, interestRate, totalInstallments, startDate, periodType } =
+      params;
+
+    const firstDueDate = this.calculateDueDate(startDate, periodType, 1);
     const currency = capital.currency;
 
     // Tasa por período como decimal: 10% -> 0.10
@@ -156,11 +157,13 @@ export class LoanCalculatorService {
       case PeriodType.WEEKLY:
         date.setUTCDate(date.getUTCDate() + offset * 7);
         break;
+      case PeriodType.FORTNIGHTLY:
+        date.setUTCDate(date.getUTCDate() + offset * 15);
+        break;
       case PeriodType.MONTHLY:
         date.setUTCMonth(date.getUTCMonth() + offset);
         break;
       case PeriodType.CUSTOM:
-        // En modo custom, las fechas las proporciona el usuario
         break;
     }
 

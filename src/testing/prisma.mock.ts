@@ -16,6 +16,24 @@ export interface PrismaServiceMock {
     delete: jest.Mock;
     $transaction: jest.Mock;
   };
+  guarantee: {
+    create: jest.Mock;
+    findMany: jest.Mock;
+    findFirst: jest.Mock;
+    update: jest.Mock;
+  };
+  loan: {
+    findMany: jest.Mock;
+    findFirst: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+  };
+  loanGuarantee: {
+    create: jest.Mock;
+    findFirst: jest.Mock;
+    update: jest.Mock;
+  };
+  $transaction: jest.Mock;
   $connect: jest.Mock;
   $disconnect: jest.Mock;
 }
@@ -34,6 +52,24 @@ export function createPrismaMock(): PrismaServiceMock {
       delete: jest.fn(),
       $transaction: jest.fn(),
     },
+    guarantee: {
+      create: jest.fn(),
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+      update: jest.fn(),
+    },
+    loan: {
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
+    loanGuarantee: {
+      create: jest.fn(),
+      findFirst: jest.fn(),
+      update: jest.fn(),
+    },
+    $transaction: jest.fn(),
     $connect: jest.fn(),
     $disconnect: jest.fn(),
   };

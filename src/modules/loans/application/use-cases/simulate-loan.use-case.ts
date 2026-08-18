@@ -18,13 +18,13 @@ export class SimulateLoanUseCase {
   execute(dto: SimulateLoanDto): SimulationResult {
     const capital = Money.of(dto.capitalAmount, dto.currency);
     const interestRate = new Decimal(dto.interestRate);
-    const firstDueDate = new Date(dto.firstDueDate);
+    const startDate = new Date(dto.startDate);
 
     const result = this.calculator.calculateInstallments({
       capital,
       interestRate,
       totalInstallments: dto.totalInstallments,
-      firstDueDate,
+      startDate,
       periodType: dto.periodType,
     });
 

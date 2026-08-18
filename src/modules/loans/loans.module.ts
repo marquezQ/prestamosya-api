@@ -7,6 +7,9 @@ import { InstallmentRepository } from './domain/repositories/installment.reposit
 import { UnitOfWork } from './application/ports/unit-of-work.port';
 import { CreateLoanUseCase } from './application/use-cases/create-loan.use-case';
 import { SimulateLoanUseCase } from './application/use-cases/simulate-loan.use-case';
+import { LinkGuaranteeUseCase } from './application/use-cases/link-guarantee.use-case';
+import { UnlinkGuaranteeUseCase } from './application/use-cases/unlink-guarantee.use-case';
+import { GetLoanDetailUseCase } from './application/use-cases/get-loan-detail.use-case';
 import { PrismaLoanRepository } from './infrastructure/repositories/prisma-loan.repository';
 import { PrismaInstallmentRepository } from './infrastructure/repositories/prisma-installment.repository';
 import { PrismaUnitOfWork } from './infrastructure/prisma-unit-of-work';
@@ -19,6 +22,9 @@ import { LoansController } from './infrastructure/loans.controller';
     LoanCalculatorService,
     CreateLoanUseCase,
     SimulateLoanUseCase,
+    LinkGuaranteeUseCase,
+    UnlinkGuaranteeUseCase,
+    GetLoanDetailUseCase,
     // useFactory garantiza que PrismaService se inyecta explícitamente.
     // No podemos usar useClass porque el constructor recibe PrismaClientLike
     // (type alias), que TypeScript compila a `Object` en reflect-metadata

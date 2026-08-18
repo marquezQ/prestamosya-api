@@ -84,7 +84,6 @@ describe('CreateLoanUseCase', () => {
       periodType: PeriodType.MONTHLY,
       totalInstallments: 3,
       startDate: '2026-08-15',
-      firstDueDate: '2026-09-15',
     };
 
     const result = await useCase.execute('user-1', dto);
@@ -94,6 +93,8 @@ describe('CreateLoanUseCase', () => {
     expect(result.capitalAmount.toNumber()).toBe(1000);
     expect(result.totalAmount.toNumber()).toBe(1300);
     expect(result.installments).toHaveLength(3);
+    // firstDueDate se calcula: startDate (2026-08-15) + 1 mes = 2026-09-15
+    expect(result.firstDueDate.toISOString().split('T')[0]).toBe('2026-09-15');
 
     expect(mockPrismaService.client.findFirst).toHaveBeenCalledWith({
       where: { id: 'client-1', userId: 'user-1', deletedAt: null },
@@ -119,7 +120,6 @@ describe('CreateLoanUseCase', () => {
       periodType: PeriodType.MONTHLY,
       totalInstallments: 3,
       startDate: '2026-08-15',
-      firstDueDate: '2026-09-15',
     };
 
     await expect(useCase.execute('user-1', dto)).rejects.toThrow(
@@ -142,7 +142,6 @@ describe('CreateLoanUseCase', () => {
       interestRate: 10,
       totalInstallments: 3,
       startDate: '2026-08-15',
-      firstDueDate: '2026-09-15',
     };
 
     await expect(useCase.execute('user-1', dto)).rejects.toThrow(
@@ -165,7 +164,6 @@ describe('CreateLoanUseCase', () => {
       interestRate: 0,
       totalInstallments: 2,
       startDate: '2026-08-15',
-      firstDueDate: '2026-09-15',
       manualInstallments: [
         {
           installmentNumber: 1,
@@ -189,6 +187,8 @@ describe('CreateLoanUseCase', () => {
     expect(result).toBeDefined();
     expect(result.totalAmount.toNumber()).toBe(1100);
     expect(result.installments).toHaveLength(2);
+    // firstDueDate se toma de la primera cuota manual
+    expect(result.firstDueDate.toISOString().split('T')[0]).toBe('2026-09-15');
     expect(mockLoanRepository.save).toHaveBeenCalled();
   });
 
@@ -207,7 +207,6 @@ describe('CreateLoanUseCase', () => {
       interestRate: 0,
       totalInstallments: 2,
       startDate: '2026-08-15',
-      firstDueDate: '2026-09-15',
       manualInstallments: [
         {
           installmentNumber: 1,
@@ -229,5 +228,73 @@ describe('CreateLoanUseCase', () => {
     await expect(useCase.execute('user-1', dto)).rejects.toThrow(
       InvalidInstallmentsError,
     );
+  });
+
+  it('should auto-calculate firstDueDate from startDate in automatic mode', async () => {
+    mockPrismaService.client.findFirst.mockResolvedValue({
+      id: 'client-1',
+      userId: 'user-1',
+      status: 'NO_LOAN',
+    });
+
+    const dto: CreateLoanDto = {
+      clientId: 'client-1',
+      mode: LoanMode.AUTOMATIC,
+      capitalAmount: 1000,
+      currency: 'BOB',
+      interestRate: 10,
+      periodType: PeriodType.MONTHLY,
+      totalInstallments: 3,
+      startDate: '2026-08-15',
+    };
+
+    const result = await useCase.execute('user-1', dto);
+
+    expect(result).toBeDefined();
+    expect(result.status).toBe(LoanStatus.ACTIVE);
+    expect(result.installments).toHaveLength(3);
+    expect(result.firstDueDate.toISOString().split('T')[0]).toBe('2026-09-15');
+    expect(result.installments[0].dueDate.toISOString().split('T')[0]).toBe(
+      '2026-09-15',
+    );
+  });
+
+  it('should auto-calculate firstDueDate from first manual installment', async () => {
+    mockPrismaService.client.findFirst.mockResolvedValue({
+      id: 'client-1',
+      userId: 'user-1',
+      status: 'CURRENT',
+    });
+
+    const dto: CreateLoanDto = {
+      clientId: 'client-1',
+      mode: LoanMode.MANUAL,
+      capitalAmount: 1000,
+      currency: 'BOB',
+      interestRate: 0,
+      totalInstallments: 2,
+      startDate: '2026-08-15',
+      manualInstallments: [
+        {
+          installmentNumber: 1,
+          dueDate: '2026-09-20',
+          capitalAmount: 500,
+          interestAmount: 50,
+          totalAmount: 550,
+        },
+        {
+          installmentNumber: 2,
+          dueDate: '2026-10-20',
+          capitalAmount: 500,
+          interestAmount: 50,
+          totalAmount: 550,
+        },
+      ],
+    };
+
+    const result = await useCase.execute('user-1', dto);
+
+    expect(result).toBeDefined();
+    expect(result.firstDueDate.toISOString().split('T')[0]).toBe('2026-09-20');
   });
 });

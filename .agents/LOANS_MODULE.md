@@ -59,8 +59,17 @@ La primera etapa de construcción estableció los cimientos y el flujo completo 
   2. **Bug Auth Postman**: El decorador `@ApiBearerAuth()` en el controlador rompía la herencia de auth en la carpeta de Postman. **Solución:** Remover el decorador y confiar en la configuración de seguridad global (`document.security` en `main.ts`).
   3. **Bug CurrentUser JWT**: El payload de JWT guarda el ID en `.sub`, no en `.id`. **Solución:** Uso correcto de `@CurrentUser() user: JwtPayload` -> `user.sub`.
 
+### Fase 6: Módulo Guarantees y Vinculación
+- **CRUD de Garantías por Cliente**: Módulo `GuaranteesModule` (`POST/GET/PATCH/DELETE /api/guarantees`). Permite registrar garantías pertenecientes a un cliente. Soft delete habilitado; prohíbe eliminar si está `IN_USE`.
+- **`LinkGuaranteeUseCase`**: Vincula una garantía `AVAILABLE` a un préstamo (`POST /api/loans/:id/guarantees`). Marca la garantía como `IN_USE` y la vinculación como `ACTIVE`. Impide doble vinculación.
+- **`UnlinkGuaranteeUseCase`**: Desvincula la garantía (`DELETE /api/loans/:id/guarantees/:guaranteeId`), devuelve la garantía a `AVAILABLE` y marca el link como `RELEASED`.
+
+### Fase 7: Detalle del Préstamo y Consultas (`GetLoanDetailUseCase`)
+- **`GET /api/loans/:id`**: Retorna la estructura completa del préstamo (`loan`, `installments`, `guarantees`, `payments`).
+- **`GET /api/loans/:id/installments`**: Retorna únicamente el cronograma de cuotas activas.
+
 ### Testing de esta etapa
-- Se implementaron **+50 tests unitarios aislados** verificando exhaustivamente: las lógicas de redondeo, sumas de `Money`, validaciones matemáticas del UseCase y generación correcta de fechas límite en los cronogramas. Todo en verde (`100%` de cobertura del core).
+- Se implementaron **94 tests unitarios aislados** (`11 test suites` en verde) verificando exhaustivamente: las lógicas de redondeo, sumas de `Money`, vinculación de garantías con chequeo de estado `IN_USE`, y generación de respuestas de detalle.
 
 ---
 
@@ -68,28 +77,15 @@ La primera etapa de construcción estableció los cimientos y el flujo completo 
 
 Las siguientes fases deben desarrollarse para dar por concluido completamente el módulo financiero.
 
-### Fase 6: Flujos de Pago (Payment integration)
+### Fase 8: Flujos de Pago (Payment integration)
 - Aunque los pagos vivirán en su propio módulo (`payments`), el dominio de `loans` necesita la lógica para reaccionar a un pago.
 - **Requerido**: Añadir métodos en `LoanEntity` e `InstallmentEntity` para aplicar pagos parciales o totales y cambiar estados dinámicamente (`PENDING` -> `PARTIAL` -> `PAID`).
 
-### Fase 7: Calcular Refinanciamiento (Simulación)
+### Fase 9: Refinanciamiento (Simulación y Ejecución)
 - **Caso de uso (`CalculateRefinanceUseCase`)**: Tomar el saldo deudor actual (`outstandingBalance`), sumar capital adicional solicitado, calcular nuevo interés y simular las nuevas cuotas sin tocar la base de datos.
+- **Caso de uso (`ExecuteRefinanceUseCase`)**: Guardar snapshot en `loan_refinances`, archivar cuotas anteriores y crear el nuevo cronograma atómicamente.
 
-### Fase 8: Ejecutar Refinanciamiento
-- **Caso de uso (`ExecuteRefinanceUseCase`)**:
-  1. Guardar un "snapshot" de los totales actuales en `loan_refinances`.
-  2. Archivar (`archived: true`) las cuotas no pagadas actuales.
-  3. Reemplazar el `capitalAmount` original del préstamo por el nuevo monto.
-  4. Generar y persistir las nuevas cuotas y el registro de refinanciamiento en **una sola transacción atómica**.
-
-### Fase 9: Endpoints de Lectura y Perfil de Cliente
-- **`GET /api/loans?clientId=XYZ`**: Devolver la lista completa de préstamos de un cliente.
-- **`GET /api/loans/:id`**: Devolver el detalle de un préstamo específico (con todas sus cuotas y pagos aplicados).
-- **Integración con Clientes**: Finalizar el cálculo del *Resumen Financiero* que se devuelve en `GET /api/clients/:id`. Esto incluye:
-  - Calcular la **tasa de cumplimiento** (pagos a tiempo vs atrasados).
-  - Determinar si el cliente está **en mora** y los días de atraso totales.
-  - Sumar el saldo deudor consolidado en las diferentes monedas.
-
-### Fase 10: E2E Testing y Cron Job de Mora
-- Escribir tests End-To-End completos de `loans` validando todas las reglas financieras.
-- Construir el Cron Job (`@nestjs/schedule`) que verifica todos los días a las 6:00 AM qué cuotas no están pagadas y actualiza los `daysOverdue`.
+### Fase 10: Integración Perfil de Cliente, Cron Job de Mora y E2E
+- **Integración con Clientes**: Finalizar el cálculo del *Resumen Financiero* en `GET /api/clients/:id` (tasa de cumplimiento, días de atraso acumulados, saldo por moneda).
+- **Cron Job de Mora**: `@nestjs/schedule` diario a las 6:00 AM.
+- **E2E Testing**: Suite de tests End-to-End con base de datos de pruebas real.
