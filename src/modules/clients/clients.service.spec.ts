@@ -9,8 +9,12 @@ import {
 
 /**
  * Unit tests de ClientsService: se inyecta un mock de Prisma (sin BD) para
- * probar solo la lógica del service. El caso clave es `findOne()`, que agrega
- * el resumen financiero por moneda, mora y siguiente cuota.
+ * probar solo la lógica del service.
+ *
+ * Casos clave:
+ * - `findAll()` agrega `activeLoanCount` consultando los préstamos activos.
+ * - `findOne()` separa los préstamos en `activeLoans` y `completedLoans` sin
+ *   arrastrar cuotas, y no expone resumen financiero.
  */
 describe('ClientsService', () => {
   let service: ClientsService;
@@ -19,8 +23,8 @@ describe('ClientsService', () => {
   /** Utilidad: convierte un número en un objeto con `.toString()` (simula Decimal de Prisma). */
   const dec = (n: number) => ({ toString: () => n.toFixed(2) });
 
-  /** Cliente base con dos préstamos (BOB y USD) y una garantía. */
-  const multiLoanClient = {
+  /** Cliente base sin relaciones (para findAll). */
+  const baseClient = {
     id: 'client-1',
     userId: 'user-1',
     fullName: 'Ana Pérez',
@@ -34,6 +38,11 @@ describe('ClientsService', () => {
     notes: 'Prefiere mañanas',
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-01-02'),
+  };
+
+  /** Cliente con préstamos (ACTIVE y COMPLETED) y una garantía (para findOne). */
+  const multiLoanClient = {
+    ...baseClient,
     guarantees: [
       {
         id: 'guarantee-1',
@@ -47,45 +56,33 @@ describe('ClientsService', () => {
     loans: [
       {
         id: 'loan-bob',
+        mode: 'automatic',
+        capitalAmount: dec(1000),
         currency: 'BOB',
-        totalAmount: dec(1000),
-        outstandingBalance: dec(400),
+        interestRate: dec(10),
+        periodType: 'monthly',
+        totalInstallments: 3,
+        totalAmount: dec(1300),
+        totalPaid: dec(650),
+        outstandingBalance: dec(650),
+        status: 'ACTIVE',
         startDate: new Date('2026-01-03'),
-        installments: [
-          {
-            id: 'inst-1',
-            installmentNumber: 1,
-            dueDate: new Date('2026-01-10'),
-            status: 'PAID',
-            totalAmount: dec(433.33),
-            paidAmount: dec(433.33),
-          },
-          {
-            id: 'inst-2',
-            installmentNumber: 2,
-            dueDate: new Date('2026-01-20'),
-            status: 'PENDING',
-            totalAmount: dec(433.34),
-            paidAmount: dec(0),
-          },
-        ],
+        createdAt: new Date('2026-01-01'),
       },
       {
         id: 'loan-usd',
+        mode: 'manual',
+        capitalAmount: dec(300),
         currency: 'USD',
+        interestRate: dec(0),
+        periodType: null,
+        totalInstallments: 2,
         totalAmount: dec(300),
-        outstandingBalance: dec(200),
+        totalPaid: dec(300),
+        outstandingBalance: dec(0),
+        status: 'COMPLETED',
         startDate: new Date('2026-01-05'),
-        installments: [
-          {
-            id: 'inst-3',
-            installmentNumber: 1,
-            dueDate: new Date('2026-01-15'),
-            status: 'OVERDUE',
-            totalAmount: dec(200),
-            paidAmount: dec(50),
-          },
-        ],
+        createdAt: new Date('2026-01-02'),
       },
     ],
   };
@@ -97,6 +94,48 @@ describe('ClientsService', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  describe('findAll()', () => {
+    it('devuelve activeLoanCount 0 cuando el cliente no tiene préstamos activos', async () => {
+      prismaMock.client.findMany.mockResolvedValue([baseClient]);
+      prismaMock.loan.findMany.mockResolvedValue([]);
+
+      const result = await service.findAll('user-1');
+
+      expect(result.data[0].activeLoanCount).toBe(0);
+    });
+
+    it('cuenta un préstamo activo por cliente', async () => {
+      prismaMock.client.findMany.mockResolvedValue([baseClient]);
+      prismaMock.loan.findMany.mockResolvedValue([{ clientId: 'client-1' }]);
+
+      const result = await service.findAll('user-1');
+
+      expect(result.data[0].activeLoanCount).toBe(1);
+    });
+
+    it('cuenta correctamente el número de préstamos activos por cliente', async () => {
+      prismaMock.client.findMany.mockResolvedValue([baseClient]);
+      prismaMock.loan.findMany.mockResolvedValue([
+        { clientId: 'client-1' },
+        { clientId: 'client-1' },
+        { clientId: 'client-1' },
+      ]);
+
+      const result = await service.findAll('user-1');
+
+      expect(result.data[0].activeLoanCount).toBe(3);
+    });
+
+    it('no consulta préstamos si no hay clientes', async () => {
+      prismaMock.client.findMany.mockResolvedValue([]);
+
+      const result = await service.findAll('user-1');
+
+      expect(result.data).toHaveLength(0);
+      expect(prismaMock.loan.findMany).not.toHaveBeenCalled();
+    });
   });
 
   describe('create()', () => {
@@ -162,53 +201,68 @@ describe('ClientsService', () => {
       );
     });
 
-    it('agrupa el resumen financiero por moneda sin mezclarlas', async () => {
+    it('separa los préstamos en activeLoans y completedLoans', async () => {
       prismaMock.client.findFirst.mockResolvedValue(multiLoanClient);
 
       const result = await service.findOne('user-1', 'client-1');
-      const summary = result.data.financialSummary;
 
-      expect(summary).toHaveLength(2);
-      const bob = summary.find((s) => s.currency === 'BOB');
-      const usd = summary.find((s) => s.currency === 'USD');
-      expect(bob).toBeDefined();
-      expect(usd).toBeDefined();
-      // Sin mezclar: BOB suma solo saldos BOB, USD solo saldos USD.
-      expect(bob!.totalOwed).toBe(400);
-      expect(usd!.totalOwed).toBe(200);
+      expect(result.data.activeLoans).toHaveLength(1);
+      expect(result.data.activeLoans[0].id).toBe('loan-bob');
+      expect(result.data.completedLoans).toHaveLength(1);
+      expect(result.data.completedLoans[0].id).toBe('loan-usd');
     });
 
-    it('cuenta cuotas OVERDUE y su monto pendiente por moneda', async () => {
-      prismaMock.client.findFirst.mockResolvedValue(multiLoanClient);
+    it('completedLoans incluye préstamos no activos y sin nextInstallment', async () => {
+      prismaMock.client.findFirst.mockResolvedValue({
+        ...multiLoanClient,
+        loans: [
+          { ...multiLoanClient.loans[0], status: 'DEFAULTED' },
+          { ...multiLoanClient.loans[0], status: 'REFINANCED' },
+        ],
+      });
 
       const result = await service.findOne('user-1', 'client-1');
-      const usd = result.data.financialSummary.find(
-        (s) => s.currency === 'USD',
+
+      expect(result.data.activeLoans).toHaveLength(0);
+      expect(result.data.completedLoans).toHaveLength(2);
+      expect(result.data.completedLoans[0]).not.toHaveProperty(
+        'nextInstallment',
       );
-
-      expect(usd!.overdueInstallments).toBe(1);
-      // Pendiente = totalAmount - paidAmount = 200 - 50
-      expect(usd!.overdueAmount).toBe(150);
     });
 
-    it('devuelve la siguiente cuota no pagada con su monto pendiente', async () => {
+    it('convierte los valores Decimal de los préstamos a number', async () => {
       prismaMock.client.findFirst.mockResolvedValue(multiLoanClient);
 
       const result = await service.findOne('user-1', 'client-1');
-      const bobLoan = result.data.activeLoans.find((l) => l.currency === 'BOB');
+      const bob = result.data.activeLoans[0];
 
-      expect(bobLoan!.nextInstallment!.number).toBe(2);
-      // Pendiente = totalAmount - paidAmount = 433.34 - 0
-      expect(bobLoan!.nextInstallment!.pendingAmount).toBeCloseTo(433.34);
+      expect(bob.capitalAmount).toBe(1000);
+      expect(bob.totalAmount).toBe(1300);
+      expect(bob.outstandingBalance).toBe(650);
+      expect(bob.totalPaid).toBe(650);
+      expect(bob.interestRate).toBe(10);
+      expect(bob.mode).toBe('automatic');
+      expect(bob.periodType).toBe('monthly');
     });
 
-    it('convierte latitud/longitud y valores Decimal a number', async () => {
+    it('devuelve garantías y convierte latitud/longitud a number', async () => {
       prismaMock.client.findFirst.mockResolvedValue(multiLoanClient);
 
       const result = await service.findOne('user-1', 'client-1');
 
       expect(result.data.client.latitude).toBeCloseTo(-16.5001);
       expect(result.data.client.longitude).toBeCloseTo(-68.1342);
+      expect(result.data.guarantees).toHaveLength(1);
+      expect(result.data.guarantees[0].estimatedValue).toBe(15000);
+      expect(result.data.guarantees[0].status).toBe('IN_USE');
+    });
+
+    it('no expone resumen financiero', async () => {
+      prismaMock.client.findFirst.mockResolvedValue(multiLoanClient);
+
+      const result = await service.findOne('user-1', 'client-1');
+
+      expect(result.data).not.toHaveProperty('financialSummary');
     });
   });
 });

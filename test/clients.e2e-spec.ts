@@ -54,18 +54,25 @@ describe('Clients (e2e)', () => {
       expect(body.data.length).toBeGreaterThan(0);
     });
 
-    it('GET :id devuelve el perfil con el resumen financiero', async () => {
+    it('GET :id devuelve el perfil con préstamos activos y finalizados', async () => {
       const res = await request(app.getHttpServer())
         .get(`/api/clients/${clientId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
       const body = res.body as {
-        data: { client: { fullName: string }; financialSummary: unknown };
+        data: {
+          client: { fullName: string };
+          activeLoans: unknown[];
+          completedLoans: unknown[];
+          guarantees: unknown[];
+        };
       };
 
       expect(body.data.client.fullName).toBe('Cliente E2E');
-      // Perfil con las colecciones de datos esperadas.
-      expect(body.data.financialSummary).toBeDefined();
+      // El perfil expone los dos grupos de préstamos y las garantías.
+      expect(body.data.activeLoans).toBeDefined();
+      expect(body.data.completedLoans).toBeDefined();
+      expect(body.data.guarantees).toBeDefined();
     });
 
     it('PATCH actualiza un cliente', async () => {

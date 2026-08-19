@@ -3,11 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  GuaranteeStatus,
-  InstallmentStatus,
-  LoanStatus,
-} from '../../generated/prisma/client';
+import { GuaranteeStatus, LoanStatus } from '../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
@@ -22,8 +18,14 @@ export class ClientsService {
       orderBy: { createdAt: 'desc' },
     });
 
+    const clientIds = clients.map((client) => client.id);
+    const activeCounts = await this.getActiveLoanCounts(clientIds);
+
     return {
-      data: clients.map((client) => this.toClientResponse(client)),
+      data: clients.map((client) => ({
+        ...this.toClientResponse(client),
+        activeLoanCount: activeCounts.get(client.id) ?? 0,
+      })),
     };
   }
 
@@ -59,14 +61,7 @@ export class ClientsService {
           orderBy: { createdAt: 'desc' },
         },
         loans: {
-          where: { status: LoanStatus.ACTIVE },
           orderBy: { createdAt: 'desc' },
-          include: {
-            installments: {
-              where: { archived: false },
-              orderBy: { dueDate: 'asc' },
-            },
-          },
         },
       },
     });
@@ -75,67 +70,17 @@ export class ClientsService {
       throw new NotFoundException('Client not found');
     }
 
-    const summaryByCurrency = new Map<
-      string,
-      {
-        currency: string;
-        totalOwed: number;
-        overdueInstallments: number;
-        overdueAmount: number;
-      }
-    >();
-
-    const activeLoans = client.loans.map((loan) => {
-      const summary = summaryByCurrency.get(loan.currency) ?? {
-        currency: loan.currency,
-        totalOwed: 0,
-        overdueInstallments: 0,
-        overdueAmount: 0,
-      };
-      summary.totalOwed += this.decimalToNumber(loan.outstandingBalance);
-
-      for (const installment of loan.installments) {
-        if (installment.status === InstallmentStatus.OVERDUE) {
-          summary.overdueInstallments += 1;
-          summary.overdueAmount += Math.max(
-            0,
-            this.decimalToNumber(installment.totalAmount) -
-              this.decimalToNumber(installment.paidAmount),
-          );
-        }
-      }
-      summaryByCurrency.set(loan.currency, summary);
-
-      const nextInstallment = loan.installments.find(
-        (installment) => installment.status !== InstallmentStatus.PAID,
-      );
-
-      return {
-        id: loan.id,
-        currency: loan.currency,
-        totalAmount: this.decimalToNumber(loan.totalAmount),
-        outstandingBalance: this.decimalToNumber(loan.outstandingBalance),
-        startDate: loan.startDate,
-        nextInstallment: nextInstallment
-          ? {
-              id: nextInstallment.id,
-              number: nextInstallment.installmentNumber,
-              dueDate: nextInstallment.dueDate,
-              pendingAmount: Math.max(
-                0,
-                this.decimalToNumber(nextInstallment.totalAmount) -
-                  this.decimalToNumber(nextInstallment.paidAmount),
-              ),
-              status: nextInstallment.status,
-            }
-          : null,
-      };
-    });
+    const loanSummaries = client.loans.map((loan) => this.toLoanSummary(loan));
 
     return {
       data: {
         client: this.toClientResponse(client),
-        activeLoans,
+        activeLoans: loanSummaries.filter(
+          (loan) => loan.status === LoanStatus.ACTIVE,
+        ),
+        completedLoans: loanSummaries.filter(
+          (loan) => loan.status !== LoanStatus.ACTIVE,
+        ),
         guarantees: client.guarantees.map((guarantee) => ({
           id: guarantee.id,
           type: guarantee.type,
@@ -149,13 +94,6 @@ export class ClientsService {
               : 'AVAILABLE',
           createdAt: guarantee.createdAt,
         })),
-        financialSummary: Array.from(summaryByCurrency.values()).map(
-          (summary) => ({
-            ...summary,
-            totalOwed: this.roundMoney(summary.totalOwed),
-            overdueAmount: this.roundMoney(summary.overdueAmount),
-          }),
-        ),
       },
     };
   }
@@ -205,6 +143,65 @@ export class ClientsService {
     return client;
   }
 
+  /**
+   * Cuenta cuántos préstamos activos tiene cada cliente del listado.
+   */
+  private async getActiveLoanCounts(clientIds: string[]) {
+    const counts = new Map<string, number>();
+
+    if (clientIds.length === 0) {
+      return counts;
+    }
+
+    const activeLoans = await this.prisma.loan.findMany({
+      where: {
+        clientId: { in: clientIds },
+        status: LoanStatus.ACTIVE,
+      },
+      select: {
+        clientId: true,
+      },
+    });
+
+    for (const loan of activeLoans) {
+      counts.set(loan.clientId, (counts.get(loan.clientId) ?? 0) + 1);
+    }
+
+    return counts;
+  }
+
+  private toLoanSummary(loan: {
+    id: string;
+    mode: string;
+    capitalAmount: { toString(): string };
+    currency: string;
+    interestRate: { toString(): string };
+    periodType: string | null;
+    totalInstallments: number;
+    totalAmount: { toString(): string };
+    totalPaid: { toString(): string };
+    outstandingBalance: { toString(): string };
+    status: string;
+    startDate: Date;
+    createdAt: Date;
+  }) {
+    return {
+      id: loan.id,
+      currency: loan.currency,
+      mode: loan.mode,
+      capitalAmount: this.decimalToNumber(loan.capitalAmount),
+      interestRate: this.decimalToNumber(loan.interestRate),
+      periodType: loan.periodType,
+      totalInstallments: loan.totalInstallments,
+      totalAmount: this.decimalToNumber(loan.totalAmount),
+      totalPaid: this.decimalToNumber(loan.totalPaid),
+      outstandingBalance: this.decimalToNumber(loan.outstandingBalance),
+      status: loan.status,
+      startDate: loan.startDate,
+      createdAt: loan.createdAt,
+    };
+  }
+
   private toClientResponse(client: {
     id: string;
     fullName: string;
@@ -239,10 +236,6 @@ export class ClientsService {
 
   private decimalToNumber(value: { toString(): string }): number {
     return Number(value.toString());
-  }
-
-  private roundMoney(value: number): number {
-    return Math.round((value + Number.EPSILON) * 100) / 100;
   }
 
   private throwIfDuplicateCi(error: unknown): void {

@@ -4,6 +4,7 @@ import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import {
   ClientResponseDto,
+  ClientListResponseDto,
   ClientProfileResponseDto,
 } from './dto/client-response.dto';
 
@@ -35,12 +36,12 @@ export function ApiFindAllClientsDoc() {
     ApiOperation({
       summary: 'List clients',
       description:
-        'Returns all non-deleted clients for the authenticated user.',
+        'Returns all non-deleted clients for the authenticated user, with the number of active loans.',
     }),
     ApiResponse({
       status: HttpStatus.OK,
-      description: 'Client list.',
-      type: ClientResponseDto,
+      description: 'Client list with payment status.',
+      type: ClientListResponseDto,
       isArray: true,
     }),
   );
@@ -51,7 +52,7 @@ export function ApiFindOneClientDoc() {
     ApiOperation({
       summary: 'Get client profile',
       description:
-        'Returns full client profile with active loans, guarantees and financial summary.',
+        'Returns full client profile with personal info, active loans, completed loans (finished, defaulted or refinanced) and guarantees. Loan installments are NOT included: fetch GET /api/loans/:id to get the full schedule.',
     }),
     ApiResponse({
       status: HttpStatus.OK,

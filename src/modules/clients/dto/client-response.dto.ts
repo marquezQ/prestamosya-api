@@ -41,44 +41,59 @@ export class ClientResponseDto {
   updatedAt: Date;
 }
 
-export class NextInstallmentDto {
-  @ApiProperty({ example: 'b2c3d4e5-f6a7-8901-bcde-f12345678901' })
-  id: string;
-
-  @ApiProperty({ example: 3 })
-  number: number;
-
-  @ApiProperty({ example: '2026-08-15T00:00:00.000Z' })
-  dueDate: Date;
-
-  @ApiProperty({ example: 433.33 })
-  pendingAmount: number;
-
+export class ClientListResponseDto extends ClientResponseDto {
   @ApiProperty({
-    example: 'PENDING',
-    enum: ['PENDING', 'PARTIAL', 'PAID', 'OVERDUE'],
+    example: 2,
+    description: 'Cantidad de préstamos activos del cliente.',
   })
-  status: string;
+  activeLoanCount: number;
 }
 
-export class ActiveLoanDto {
+export class LoanSummaryDto {
   @ApiProperty({ example: 'c3d4e5f6-a7b8-9012-cdef-123456789012' })
   id: string;
 
   @ApiProperty({ example: 'BOB', enum: ['BOB', 'USD'] })
   currency: string;
 
+  @ApiProperty({ example: 'automatic', enum: ['automatic', 'manual'] })
+  mode: string;
+
+  @ApiProperty({ example: 1000.0 })
+  capitalAmount: number;
+
+  @ApiProperty({ example: 10 })
+  interestRate: number;
+
+  @ApiPropertyOptional({
+    example: 'monthly',
+    enum: ['daily', 'weekly', 'fortnightly', 'monthly', 'custom'],
+  })
+  periodType: string | null;
+
+  @ApiProperty({ example: 6 })
+  totalInstallments: number;
+
   @ApiProperty({ example: 1300.0 })
   totalAmount: number;
 
-  @ApiProperty({ example: 433.34 })
+  @ApiProperty({ example: 650.0 })
+  totalPaid: number;
+
+  @ApiProperty({ example: 650.0 })
   outstandingBalance: number;
+
+  @ApiProperty({
+    example: 'ACTIVE',
+    enum: ['ACTIVE', 'COMPLETED', 'DEFAULTED', 'REFINANCED'],
+  })
+  status: string;
 
   @ApiProperty({ example: '2026-07-01T00:00:00.000Z' })
   startDate: Date;
 
-  @ApiPropertyOptional({ type: NextInstallmentDto })
-  nextInstallment: NextInstallmentDto | null;
+  @ApiProperty({ example: '2026-07-01T00:00:00.000Z' })
+  createdAt: Date;
 }
 
 export class GuaranteeDto {
@@ -107,30 +122,16 @@ export class GuaranteeDto {
   createdAt: Date;
 }
 
-export class FinancialSummaryDto {
-  @ApiProperty({ example: 'BOB' })
-  currency: string;
-
-  @ApiProperty({ example: 1250.0 })
-  totalOwed: number;
-
-  @ApiProperty({ example: 2 })
-  overdueInstallments: number;
-
-  @ApiProperty({ example: 433.33 })
-  overdueAmount: number;
-}
-
 export class ClientProfileResponseDto {
   @ApiProperty({ type: ClientResponseDto })
   client: ClientResponseDto;
 
-  @ApiProperty({ type: [ActiveLoanDto] })
-  activeLoans: ActiveLoanDto[];
+  @ApiProperty({ type: [LoanSummaryDto] })
+  activeLoans: LoanSummaryDto[];
+
+  @ApiProperty({ type: [LoanSummaryDto] })
+  completedLoans: LoanSummaryDto[];
 
   @ApiProperty({ type: [GuaranteeDto] })
   guarantees: GuaranteeDto[];
-
-  @ApiProperty({ type: [FinancialSummaryDto] })
-  financialSummary: FinancialSummaryDto[];
 }

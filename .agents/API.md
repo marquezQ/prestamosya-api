@@ -25,9 +25,9 @@ POST   /api/auth/logout          → { message }                        [protegi
 ## Clients
 
 ```
-GET    /api/clients               → Client[]
+GET    /api/clients               → Client[] (con activeLoanCount)
 POST   /api/clients               → Client
-GET    /api/clients/:id           → ClientProfile (con préstamos activos, garantías, resumen financiero)
+GET    /api/clients/:id           → ClientProfile (client, activeLoans, completedLoans, guarantees — sin cuotas ni resumen financiero)
 PATCH  /api/clients/:id           → Client
 DELETE /api/clients/:id           → 200 OK (soft delete)
 ```
