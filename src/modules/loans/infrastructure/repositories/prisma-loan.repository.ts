@@ -100,4 +100,24 @@ export class PrismaLoanRepository extends LoanRepository {
       },
     });
   }
+
+  async findByIdWithPendingInstallments(
+    id: string,
+  ): Promise<LoanEntity | null> {
+    const raw = await this.prisma.loan.findUnique({
+      where: { id },
+      include: {
+        installments: {
+          where: {
+            archived: false,
+            status: { not: 'PAID' }, // PENDING, PARTIAL, OVERDUE
+          },
+          orderBy: { dueDate: 'asc' }, // FIFO: la más vieja primero
+        },
+      },
+    });
+
+    if (!raw) return null;
+    return LoanMapper.toDomain(raw);
+  }
 }

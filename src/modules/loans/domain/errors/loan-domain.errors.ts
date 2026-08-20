@@ -49,3 +49,17 @@ export class InvalidInstallmentsError extends LoanDomainError {
     this.name = 'InvalidInstallmentsError';
   }
 }
+
+export class PaymentNotFoundError extends LoanDomainError {
+  constructor(paymentId: string) {
+    super(`Payment ${paymentId} not found`);
+    this.name = 'PaymentNotFoundError';
+  }
+}
+
+export class PaymentAlreadyVoidedError extends LoanDomainError {
+  constructor(paymentId: string) {
+    super(`Payment ${paymentId} is already voided`);
+    this.name = 'PaymentAlreadyVoidedError';
+  }
+}
