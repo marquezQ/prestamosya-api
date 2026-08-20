@@ -17,7 +17,7 @@ Tres conductas que definen a un buen tester:
 2. **No probar código trivial.** El `create` de un CRUD que mapea un DTO a un insert no necesita cinco casos.
 3. **Sí probar toda lógica con decisiones y casos borde.** Redondeo, mora, saldos, anulación, cambio de moneda, duplicados, permisos cross-admin, contratos de seguridad (nunca exponer `passwordHash`).
 
-> En la práctica para este proyecto, el valor se concentra en **`ClientsService.findOne`** (resumen financiero) y **`AuthService`** (seguridad). El resto de métodos del CRUD reciben cobertura ligera.
+> En la práctica para este proyecto, el valor se concentra en **`ClientsService.findOne`** (agrupación de préstamos activos/finalizados) y **`AuthService`** (seguridad). El resto de métodos del CRUD reciben cobertura ligera.
 
 ---
 
@@ -58,13 +58,37 @@ Tres conductas que definen a un buen tester:
 
 ### E2E (`test/*.e2e-spec.ts`, con supertest)
 - Arranca la app NestJS completa (`Test.createTestingModule({ imports:[AppModule] })`), levanta la **BD real** y dispara requests por socket HTTP.
-- Valida el flujo integrado: `POST /api/auth/login` → token → `GET /api/auth/me`, CRUD real de `/api/clients`, envelope `{ data, message }`, códigos HTTP, auth Bearer.
+- Valida el flujo integrado: `POST /api/auth/login` → token → `GET /api/auth/me`, CRUD real de `/api/clients`, préstamos (`/api/loans`), garantías (`/api/guarantees`), envelope `{ data, message }`, códigos HTTP, auth Bearer, aislamiento entre admins.
 - Se ejecutan con `pnpm run test:e2e`.
 - Requieren una BD: ver sección 5.
+- **Nota:** los E2E de `loans` y `guarantees` crean sus propios clientes con `idNumber` único por corrida (máx. 20 chars) para no depender del seed.
+
+### Organización de los E2E — decisión tomada (PENDIENTE de aplicar al final)
+
+> [!IMPORTANT]
+> **Estado actual:** cada módulo tiene su propio `*.e2e-spec.ts` (`auth`, `clients`, `loans`, `guarantees`). Cada suite repite el `login()` en su `beforeAll` y las de loans/guarantees crean clientes nuevos vía `POST /api/clients`. Esto es setup legítimo (no re-testear auth), pero tiene un **acoplamiento oculto**: si se rompe `POST /api/clients`, fallan todas las suites — y se bootea la app completa una vez por archivo (más lento).
+
+**Decisión para cuando esté construido todo el sistema (payments, cron, etc.):** reorganizar los E2E por **flujos de usuario**, no por módulo (escuela de Stripe/Shopify). Cada archivo es una *historia* end-to-end, no un CRUD aislado:
+
+| Archivo futuro | Flujo que cubre |
+|----------------|-----------------|
+| `test/e2e/auth-flow.e2e-spec.ts` | login → acceso a recurso → token inválido/expirado → logout. *Orthogonal, se mantiene separado* |
+| `test/e2e/client-lifecycle.e2e-spec.ts` | crear cliente → consultar perfil → soft delete → aislamiento cross-admin |
+| `test/e2e/loan-lifecycle.e2e-spec.ts` | crear cliente → crear garantía → crear préstamo (auto/manual) → vincular garantía (IN_USE) → simular → consultar detalle → desvincular (AVAILABLE) → pagos → cerrar préstamo |
+
+Reglas de la reorganización:
+1. **Un solo `createTestApp()` por flujo** (o reutilizar la app entre suites vía `test/helpers.ts`), en vez de bootear por archivo de módulo.
+2. **Setup compartido en `helpers.ts`** (login, crear cliente base, tokens admin1/admin2) — los flujos lo importan, no lo re-implementan.
+3. **Los préstamos/garantías se crean como parte del flujo**, no con clientes aislados por módulo — así se elimina el acoplamiento a `POST /api/clients` como fixture.
+4. **Los errores de validación (400/404) y el aislamiento cross-admin** se prueban dentro del flujo que los produce, no en una suite genérica.
+5. Los **unit tests** siguen organizados por módulo (no cambian).
+
+> [!NOTE]
+> Los E2E actuales (`loans.e2e-spec.ts`, `guarantees.e2e-spec.ts`) se mantienen mientras tanto como cobertura funcional; al final del proyecto se consolidan en `loan-lifecycle.e2e-spec.ts` según esta decisión.
 
 ---
 
-## 4. Estrategia por módulo (estado actual: auth y clients)
+## 4. Estrategia por módulo (estado actual: auth, clients, loans, guarantees)
 
 ### Módulo `auth`
 | Unidad | Tipo | Prioridad | Qué cubrir |
@@ -77,13 +101,15 @@ Tres conductas que definen a un buen tester:
 ### Módulo `clients`
 | Unidad | Tipo | Prioridad | Qué cubrir |
 |--------|------|-----------|-----------|
-| `clients.service.findOne` | **Unit** | 🔴 **Alta** | resumen financiero: separación USD/BOB, conteo y monto OVERDUE, `nextInstallment`, `pendingAmount` (con `Math.max(0, …)`), Decimal → number, redondeo, scoping por `userId` (no existe / otro admin → 404) |
+| `clients.service.findOne` | **Unit** | 🔴 **Alta** | separación en `activeLoans` (ACTIVE) vs `completedLoans` (COMPLETED/DEFAULTED/REFINANCED), resumen sin cuotas, Decimal → number, scoping por `userId` (no existe / otro admin → 404), garantías |
+| `clients.service.findAll` | **Unit** | 🟡 Media | filtra por `userId` y `deletedAt: null`, `activeLoanCount` por cliente, no consulta préstamos si no hay clientes |
 | `clients.service.create` | **Unit** | 🔴 **Alta** | pasa los campos correctos, CI duplicado (Prisma `P2002`) → `ConflictException`, normaliza Decimal en latitud/longitud |
 | `clients.service.update` | **Unit** | 🟡 Media-Alta | solo los campos presentes (los `undefined` no se incluyen), `P2002` → Conflict |
 | `clients.service.remove` | **Unit** | 🟡 Media | soft-delete: setea `deletedAt` (no borrado físico) |
-| `clients.service.findAll` | **Unit** | 🟢 Media | filtra por `userId` y `deletedAt: null`, devuelve `{ data }` |
 | `clients.controller` | — | ⛔ no | plomería |
 | DTOs | E2E | 🟢 | validación (pipe global), no unit test dedicado |
+
+> **Nota:** El *resumen financiero* y `nextInstallment` ya no existen (se eliminaron). Los tests correspondientes se removieron y reemplazaron por los de agrupación `activeLoans`/`completedLoans`.
 
 ### Módulo `loans` (Clean Architecture)
 | Unidad | Tipo | Prioridad | Qué cubrir |
@@ -183,9 +209,9 @@ test/clients.e2e-spec.ts                      (e2e)
 
 ---
 
-## 9. Estado de implementación (Ejecutado: auth, clients, loans)
+## 9. Estado de implementación (Ejecutado: auth, clients, loans, guarantees)
 
-Unit y E2E de `auth` y `clients` implementados y en verde. Testing unitario completo del dominio y casos de uso del módulo `loans` (Clean Architecture). Queda pendiente E2E de `loans`, y el testing de los módulos futuros (payments, cron, garantías).
+Unit y E2E de `auth`, `clients`, `loans` y `guarantees` implementados y en verde. Testing unitario completo del dominio y casos de uso del módulo `loans` (Clean Architecture). El E2E de `loans` cubre la creación automática/manual, simulación, detalle y cuotas; el de `guarantees` cubre el CRUD y el ciclo AVAILABLE → IN_USE → AVAILABLE al vincular a un préstamo.
 
 | Id | Qué | Archivos | Estado |
 |----|-----|----------|--------|
@@ -198,9 +224,11 @@ Unit y E2E de `auth` y `clients` implementados y en verde. Testing unitario comp
 | 7 | E2E `clients` | `test/clients.e2e-spec.ts` | ✅ |
 | 8 | Unit Dominio `loans` | `src/modules/loans/domain/**/*.spec.ts` | ✅ |
 | 9 | Unit Use Cases `loans`| `src/modules/loans/application/**/*.spec.ts`| ✅ |
-| 10| Verificación general | — | ✅ |
+| 10 | E2E `loans` | `test/loans.e2e-spec.ts` | ✅ |
+| 11 | E2E `guarantees` | `test/guarantees.e2e-spec.ts` | ✅ |
+| 12| Verificación general | — | ✅ |
 
-**Resultado:** `86` tests unit + E2E en verde. Cobertura del dominio de `loans` cercana al 100%.
+**Resultado:** `106` tests unit + `48` tests E2E en verde. Cobertura del dominio de `loans` cercana al 100%.
 
 ---
 
@@ -234,11 +262,13 @@ El orden prioriza probar el costo de cada técnica en su momento y ver la utilid
 ### Paso 3 — Unit test de `clients.service` (🔴, el más valioso)
 - [ ] Mockear `PrismaService`.
 - **`findOne`**:
-  - perfil con préstamos en BOB y USD → `financialSummary` agrupa por moneda sin mezclar.
-  - `overdueInstallments` y `overdueAmount` correctos para cuota OVERDUE.
-  - `nextInstallment` devuelve la primera no-PAID y `pendingAmount = total - paid` (≥ 0).
+  - préstamo ACTIVE va a `activeLoans`; COMPLETED/DEFAULTED/REFINANCED van a `completedLoans`.
+  - resumen sin cuotas ni `nextInstallment` (el detalle se carga con `GET /api/loans/:id`).
   - cliente de otro `userId` → `NotFoundException`.
   - Decimal → number y redondeo.
+- **`findAll`**:
+  - `activeLoanCount` por cliente (0 si no tiene préstamos activos).
+  - no consulta préstamos si no hay clientes.
 - **`create`**:
   - CI duplicado (`P2002`) → `ConflictException('ID number already exists')` (probar el catch exacto).
   - campos pasados al `data` correcto; lat/lon null.
@@ -296,4 +326,4 @@ El orden prioriza probar el costo de cada técnica en su momento y ver la utilid
 
 ## 11. Convivencia con el resto de la doc
 - Leer también: `BUSINESS_RULES.md` (pagos/cuotas/mora/refinanciamiento), `CONVENTIONS.md` (commits `test(...)`, ramas `feat/PED-XX`), `STACK.md`.
-- Commits acordes: `test(clients): cubrir resumen financiero multi-moneda`.
+- Commits acordes: `test(clients): cubrir agrupación de préstamos activos/finalizados`.

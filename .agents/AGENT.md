@@ -49,7 +49,11 @@ Este repositorio es exclusivamente el backend. El frontend vive en `prestamosya-
 
 10. **La última cuota absorbe la diferencia de redondeo** — la suma exacta de cuotas debe ser igual a `loan.totalAmount`.
 
-11. **No cambiar el sistema de módulos** — `tsconfig.json` usa `"module": "CommonJS"` y `prisma/schema.prisma` usa `moduleFormat = "commonjs"`. Esta configuración es deliberada para que NestJS (CJS) conviva con Prisma v7 (que genera ESM por defecto). Cambiar cualquiera de estas opciones sin entender las implicaciones rompe el arranque del servidor. Ver sección "Configuración del sistema de módulos" en `STACK.md`.
+11. **Nunca pedir `firstDueDate` al frontend** — en `POST /api/loans` y `POST /api/loans/simulate` el input es solo `startDate`; el backend calcula la primera cuota como `startDate + 1 período` (ver `BUSINESS_RULES.md`). `firstDueDate` solo se lee/escribe por el backend.
+
+12. **`PeriodType` incluye `fortnightly` (quincenal)** — avanza +15 días. Valores válidos: `daily`, `weekly`, `fortnightly`, `monthly`, `custom`.
+
+13. **No cambiar el sistema de módulos** — `tsconfig.json` usa `"module": "CommonJS"` y `prisma/schema.prisma` usa `moduleFormat = "commonjs"`. Esta configuración es deliberada para que NestJS (CJS) conviva con Prisma v7 (que genera ESM por defecto). Cambiar cualquiera de estas opciones sin entender las implicaciones rompe el arranque del servidor. Ver sección "Configuración del sistema de módulos" en `STACK.md`.
 
 
 ---

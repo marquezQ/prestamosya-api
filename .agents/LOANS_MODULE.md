@@ -68,6 +68,14 @@ La primera etapa de construcción estableció los cimientos y el flujo completo 
 - **`GET /api/loans/:id`**: Retorna la estructura completa del préstamo (`loan`, `installments`, `guarantees`, `payments`).
 - **`GET /api/loans/:id/installments`**: Retorna únicamente el cronograma de cuotas activas.
 
+### Fase 7b: Período quincenal y fecha de primera cuota automática
+- **`fortnightly`**: Se agregó el valor `FORTNIGHTLY = 'fortnightly'` al enum de dominio `PeriodType` y a Prisma (`migration 20260818012602_add_fortnightly_period`). En `LoanCalculatorService.calculateDueDate()` un período quincenal avanza **+15 días** (`date.setUTCDate(date.getUTCDate() + offset * 15)`).
+- **`firstDueDate` eliminado de los DTOs de entrada**: `CreateLoanDto` y `SimulateLoanDto` ya **no aceptan** `firstDueDate`; solo reciben `startDate`. El backend lo calcula siempre:
+  - Automático: `calculateDueDate(startDate, periodType, 1)` (startDate + 1 período).
+  - Manual: `installments[0].dueDate`.
+- `firstDueDate` sigue presente en la entidad `Loan`, la BD (`first_due_date`) y las respuestas. **Regla: nunca volver a pedir `firstDueDate` al frontend.**
+- El cliente se marca `CURRENT` al crear su primer préstamo si estaba `NO_LOAN` (ver `create-loan.use-case.ts`).
+
 ### Testing de esta etapa
 - Se implementaron **94 tests unitarios aislados** (`11 test suites` en verde) verificando exhaustivamente: las lógicas de redondeo, sumas de `Money`, vinculación de garantías con chequeo de estado `IN_USE`, y generación de respuestas de detalle.
 
@@ -85,7 +93,7 @@ Las siguientes fases deben desarrollarse para dar por concluido completamente el
 - **Caso de uso (`CalculateRefinanceUseCase`)**: Tomar el saldo deudor actual (`outstandingBalance`), sumar capital adicional solicitado, calcular nuevo interés y simular las nuevas cuotas sin tocar la base de datos.
 - **Caso de uso (`ExecuteRefinanceUseCase`)**: Guardar snapshot en `loan_refinances`, archivar cuotas anteriores y crear el nuevo cronograma atómicamente.
 
-### Fase 10: Integración Perfil de Cliente, Cron Job de Mora y E2E
-- **Integración con Clientes**: Finalizar el cálculo del *Resumen Financiero* en `GET /api/clients/:id` (tasa de cumplimiento, días de atraso acumulados, saldo por moneda).
-- **Cron Job de Mora**: `@nestjs/schedule` diario a las 6:00 AM.
-- **E2E Testing**: Suite de tests End-to-End con base de datos de pruebas real.
+### Fase 10: Cron Job de Mora y E2E
+- **Integración con Clientes**: El perfil `GET /api/clients/:id` ya agrupa préstamos en `activeLoans`/`completedLoans` (resúmenes sin cuotas; el cronograma se carga con `GET /api/loans/:id`). El *resumen financiero* se descartó por decisión de producto.
+- **Cron Job de Mora**: `@nestjs/schedule` diario a las 6:00 AM. Aún no implementado — hasta que exista, ninguna cuota pasa a `OVERDUE` y `clients.status` solo cambia `NO_LOAN → CURRENT`.
+- **E2E Testing**: Suite End-to-End con BD real de test (`test/loans.e2e-spec.ts` y `test/guarantees.e2e-spec.ts`). Cubre creación automática/manual (verificando la fórmula flat-rate y `firstDueDate`), simulación, detalle/cuotas, validaciones, aislamiento entre admins y el ciclo AVAILABLE → IN_USE → AVAILABLE de garantías.
