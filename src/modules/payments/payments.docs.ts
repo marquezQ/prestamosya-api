@@ -1,12 +1,19 @@
 import { applyDecorators } from '@nestjs/common';
-import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
 
 export function ApiGetPaymentDashboardDoc() {
   return applyDecorators(
     ApiOperation({
-      summary: 'Obtener dashboard de pagos del cobrador/administrador',
+      summary: 'Obtener dashboard dinámico de pagos del cobrador/administrador',
       description:
-        'Devuelve las cuotas divididas en 3 secciones: cuotas que vencen hoy, cuotas en mora de días anteriores y cuotas pagadas en la fecha actual.',
+        'Devuelve las cuotas divididas en 3 secciones para la fecha dada (o fecha de hoy por defecto): cuotas que vencen ese día, cuotas en mora y cuotas pagadas en esa fecha.',
+    }),
+    ApiQuery({
+      name: 'date',
+      required: false,
+      description:
+        'Fecha seleccionada en el carrusel de la UI (formato YYYY-MM-DD). Si se omite, usa la fecha de hoy.',
+      example: '2026-08-20',
     }),
     ApiResponse({
       status: 200,

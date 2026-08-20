@@ -70,26 +70,31 @@ POST   /api/loans/:id/refinance               → LoanRefinance + nuevas Install
 ## Payments
 
 ```
-GET    /api/payments/dashboard   → { dueToday[], overdue[], paidToday[] }
-POST   /api/payments             → RegisterPaymentResult (aplica pago FIFO)
-DELETE /api/payments/:id         → 200 OK (anular pago, requiere { reason } en body)
+GET    /api/payments/dashboard?date=2026-08-20  → { metadata: { targetDate, serverToday }, dueToday[], overdue[], paidToday[] }
+POST   /api/payments                            → RegisterPaymentResult (aplica pago FIFO)
+DELETE /api/payments/:id                        → 200 OK (anular pago, requiere { reason } en body)
 ```
+
+> **Dashboard Dinámico de Pagos:** El parámetro `?date=YYYY-MM-DD` es opcional. Permite navegar por la agenda/carrusel de fechas de la UI. Si se omite, asume la fecha actual del servidor (`serverToday`). devuelven metadatos con la fecha consultada (`targetDate`) y la fecha real del servidor (`serverToday`).
 
 ### Ejemplos de Body JSON para Postman:
 
 **1. Registrar un pago (`POST /api/payments`)**
+
 ```json
 {
   "loanId": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
-  "amount": 500.00,
+  "amount": 500.0,
   "method": "cash",
   "paymentDate": "2026-08-19",
   "notes": "Pago entregado en mano"
 }
 ```
+
 > `method` acepta: `"cash"`, `"transfer"`, `"qr"`. `paymentDate` formato: `YYYY-MM-DD`.
 
 **2. Anular un pago (`DELETE /api/payments/:id`)**
+
 ```json
 {
   "reason": "Error en el monto digitado"
@@ -97,7 +102,6 @@ DELETE /api/payments/:id         → 200 OK (anular pago, requiere { reason } en
 ```
 
 > **Nota Swagger / Postman:** Los DTOs tienen decoradores `@ApiProperty` con `default` configurados. Al acceder a `/api` (Swagger UI) o `/api-json` (para importar la colección a Postman), los cuerpos de solicitud se autocompletan con estos valores de ejemplo.
-
 
 ---
 
@@ -133,6 +137,7 @@ POST   /api/admin/recalculate-overdue → forzar recálculo manual del cron de m
 ```
 
 ### Ejemplo de respuesta (`POST /api/admin/recalculate-overdue`):
+
 > No requiere body en el request.
 
 ```json
@@ -149,7 +154,6 @@ POST   /api/admin/recalculate-overdue → forzar recálculo manual del cron de m
 ```
 
 > **Nota Swagger / Postman:** Al acceder a Swagger UI (`/api`) o importar la colección en Postman (`/api-json`), el endpoint aparece listado bajo la categoría **admin**.
-
 
 ---
 

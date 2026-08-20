@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Query,
   BadRequestException,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
@@ -16,6 +17,7 @@ import { GetPaymentDashboardUseCase } from '../loans/application/use-cases/get-p
 import { RegisterPaymentUseCase } from '../loans/application/use-cases/register-payment.use-case';
 import { VoidPaymentUseCase } from '../loans/application/use-cases/void-payment.use-case';
 import { LoanDomainError } from '../loans/domain/errors/loan-domain.errors';
+import { QueryPaymentDashboardDto } from './dto/query-payment-dashboard.dto';
 import { RegisterPaymentDto } from './dto/register-payment.dto';
 import { VoidPaymentDto } from './dto/void-payment.dto';
 import {
@@ -35,8 +37,14 @@ export class PaymentsController {
 
   @Get('dashboard')
   @ApiGetPaymentDashboardDoc()
-  async getDashboard(@CurrentUser() user: JwtPayload) {
-    const data = await this.getPaymentDashboardUseCase.execute(user.sub);
+  async getDashboard(
+    @CurrentUser() user: JwtPayload,
+    @Query() query: QueryPaymentDashboardDto,
+  ) {
+    const data = await this.getPaymentDashboardUseCase.execute(
+      user.sub,
+      query.date,
+    );
     return { data };
   }
 
