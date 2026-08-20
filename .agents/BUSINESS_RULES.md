@@ -35,6 +35,12 @@ Reglas de negocio que el agente debe respetar en todo momento.
 
 ## Mora y Cron Job
 
+> [!NOTE]
+> **El cron de mora aún NO está implementado.** Las cuotas se crean con `status: PENDING` y nadie las pasa a `OVERDUE` todavía. Implicaciones:
+> - `daysOverdue` queda siempre en 0 y ningún cliente llega a `DELINQUENT`.
+> - El campo `clients.status` (ClientStatus) solo pasa de `NO_LOAN` a `CURRENT` al crear el primer préstamo (ver `create-loan.use-case.ts`).
+> - Cuando se implemente el cron, la lógica que depende de cuotas `OVERDUE` funcionará sin cambios (p. ej. la futura detección de mora en el perfil de cliente).
+
 El cron corre a las **6:00 AM diario** con la expresión `@Cron('0 6 * * *')`.
 
 ```typescript
@@ -97,6 +103,24 @@ async checkOverdueInstallments() {
 
 Es el componente más crítico. Vive en `loans/domain/services/` — TypeScript puro, sin dependencias externas ni NestJS.
 
+### Fecha de primera cuota (firstDueDate) — SIEMPRE la calcula el backend
+
+> [!IMPORTANT]
+> El campo `firstDueDate` **no existe en ningún DTO de entrada** (ni `POST /api/loans` ni `POST /api/loans/simulate`). El frontend **solo envía `startDate`** (fecha de desembolso) y el backend calcula la primera cuota como `startDate + 1 período`:
+>
+> | Período | Avance de 1 cuota |
+> |---------|-------------------|
+> | `daily` | +1 día |
+> | `weekly` | +7 días |
+> | `fortnightly` | +15 días |
+> | `monthly` | +1 mes |
+> | `custom` | no aplica (solo modo manual) |
+>
+> - En modo **AUTOMATIC**: `LoanCalculatorService.calculateDueDate(startDate, periodType, 1)`.
+> - En modo **MANUAL**: `firstDueDate = installments[0].dueDate` del cronograma enviado.
+>
+> `firstDueDate` sigue existiendo en la entidad `Loan`, en la BD (columna `first_due_date`) y en las **respuestas** de la API — solo se quitó de los **inputs**.
+
 ### Modo automático — interés fijo sobre capital
 
 ```
@@ -108,6 +132,10 @@ Ejemplo: Bs 1.000 al 10% mensual × 3 cuotas
   cuota total       = 433.33
   última cuota ajustada para absorber diferencia de redondeo
 ```
+
+### Tipos de período soportados
+
+El enum `PeriodType` incluye: `daily`, `weekly`, **`fortnightly`** (quincenal, +15 días), `monthly`, `custom`. El valor `fortnightly` se agregó con la migración `20260818012602_add_fortnightly_period`.
 
 ### Modo manual
 

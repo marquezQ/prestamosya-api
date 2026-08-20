@@ -56,6 +56,7 @@ enum Currency {
 enum PeriodType {
   daily
   weekly
+  fortnightly
   monthly
   custom
 }
@@ -361,6 +362,13 @@ model LoanRefinance {
 ---
 
 ## Migraciones y Seeding (Prisma 7)
+
+### Migraciones aplicadas
+
+| Migración | Descripción |
+|-----------|-------------|
+| `20260615150807_init` | Esquema inicial del MVP |
+| `20260818012602_add_fortnightly_period` | Agrega `fortnightly` (quincenal) al enum `PeriodType`. Aplicada en dev y se aplicará automáticamente en prod vía `prisma migrate deploy` en el CI/CD |
 
 ### Configuración
 En **Prisma 7**, las migraciones y la ejecución de seeds se centralizan en `prisma.config.ts` (en lugar de `package.json`):

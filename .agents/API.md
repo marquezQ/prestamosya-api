@@ -25,25 +25,29 @@ POST   /api/auth/logout          → { message }                        [protegi
 ## Clients
 
 ```
-GET    /api/clients               → Client[] (con activeLoanCount)
+GET    /api/clients               → Client[] (cada item incluye activeLoanCount; status = ClientStatus del DB)
 POST   /api/clients               → Client
-GET    /api/clients/:id           → ClientProfile (client, activeLoans, completedLoans, guarantees — sin cuotas ni resumen financiero)
+GET    /api/clients/:id           → ClientProfile { client, activeLoans[], completedLoans[], guarantees[] }
 PATCH  /api/clients/:id           → Client
 DELETE /api/clients/:id           → 200 OK (soft delete)
 ```
+
+> **Perfil de cliente (`GET /api/clients/:id`):** los préstamos se agrupan en `activeLoans` (`status: ACTIVE`) y `completedLoans` (`COMPLETED` | `DEFAULTED` | `REFINANCED`). Cada préstamo es un **resumen** (sin cuotas ni pagos). Para ver el cronograma completo se llama a `GET /api/loans/:id`. No existe resumen financiero ni `nextInstallment` en este endpoint.
 
 ---
 
 ## Guarantees
 
 ```
-POST   /api/clients/:id/guarantees            → Guarantee
-GET    /api/clients/:id/guarantees            → Guarantee[]
-PATCH  /api/guarantees/:id                    → Guarantee
-DELETE /api/guarantees/:id                    → 200 OK (soft delete)
-POST   /api/guarantees/:id/photos             → GuaranteePhoto
-DELETE /api/guarantees/:id/photos/:photoId    → 200 OK
+POST   /api/guarantees                         → Guarantee (clientId va en el body)
+GET    /api/guarantees?clientId=xxx            → Guarantee[]
+GET    /api/guarantees/:id                     → Guarantee
+PATCH  /api/guarantees/:id                     → Guarantee (clientId no editable)
+DELETE /api/guarantees/:id                     → 200 OK (soft delete; bloqueado si IN_USE)
 ```
+
+> [!NOTE]
+> **Fotos de garantías NO implementadas.** La tabla `guarantee_photos` existe en BD pero no hay endpoints. Bloqueado hasta decidir proveedor de almacenamiento de archivos (Cloudinary/ImageKit — ver `STACK.md`).
 
 ---
 
@@ -58,6 +62,8 @@ POST   /api/loans/:id/guarantees              → LoanGuarantee (vincular garant
 DELETE /api/loans/:id/guarantees/:guaranteeId → 200 OK (desvincular)
 POST   /api/loans/:id/refinance               → LoanRefinance + nuevas Installment[]
 ```
+
+> **Bodies de create/simulate:** el campo `firstDueDate` NO se envía. El body usa `startDate` (fecha de desembolso, YYYY-MM-DD) y el backend calcula la primera cuota como `startDate + 1 período`. `periodType` válido: `daily`, `weekly`, `fortnightly`, `monthly`, `custom`.
 
 ---
 
