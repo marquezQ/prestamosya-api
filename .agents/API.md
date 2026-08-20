@@ -70,10 +70,34 @@ POST   /api/loans/:id/refinance               → LoanRefinance + nuevas Install
 ## Payments
 
 ```
-POST   /api/payments             → Payment + PaymentInstallment[]
-GET    /api/loans/:id/payments   → Payment[]
-DELETE /api/payments/:id         → 200 OK (anular, requiere void_reason en body)
+GET    /api/payments/dashboard   → { dueToday[], overdue[], paidToday[] }
+POST   /api/payments             → RegisterPaymentResult (aplica pago FIFO)
+DELETE /api/payments/:id         → 200 OK (anular pago, requiere { reason } en body)
 ```
+
+### Ejemplos de Body JSON para Postman:
+
+**1. Registrar un pago (`POST /api/payments`)**
+```json
+{
+  "loanId": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
+  "amount": 500.00,
+  "method": "cash",
+  "paymentDate": "2026-08-19",
+  "notes": "Pago entregado en mano"
+}
+```
+> `method` acepta: `"cash"`, `"transfer"`, `"qr"`. `paymentDate` formato: `YYYY-MM-DD`.
+
+**2. Anular un pago (`DELETE /api/payments/:id`)**
+```json
+{
+  "reason": "Error en el monto digitado"
+}
+```
+
+> **Nota Swagger / Postman:** Los DTOs tienen decoradores `@ApiProperty` con `default` configurados. Al acceder a `/api` (Swagger UI) o `/api-json` (para importar la colección a Postman), los cuerpos de solicitud se autocompletan con estos valores de ejemplo.
+
 
 ---
 

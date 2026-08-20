@@ -86,8 +86,15 @@ La primera etapa de construcción estableció los cimientos y el flujo completo 
 Las siguientes fases deben desarrollarse para dar por concluido completamente el módulo financiero.
 
 ### Fase 8: Flujos de Pago (Payment integration)
-- Aunque los pagos vivirán en su propio módulo (`payments`), el dominio de `loans` necesita la lógica para reaccionar a un pago.
-- **Requerido**: Añadir métodos en `LoanEntity` e `InstallmentEntity` para aplicar pagos parciales o totales y cambiar estados dinámicamente (`PENDING` -> `PARTIAL` -> `PAID`).
+- **`PaymentRepository` & `PrismaPaymentRepository`**: Abstracción e infraestructura para persistir pagos (`payments`) y enlaces a cuotas (`payment_installments`).
+- **`UnitOfWork` extendido**: Transaccionalidad atómica asegurada entre `loans`, `installments` y `payments`.
+- **`RegisterPaymentUseCase`**: Distribución automática de montos en orden FIFO (`dueDate ASC`) entre cuotas pendientes usando el patrón surplus de `InstallmentEntity.applyPayment()`. Manejo de pagos parciales (`PARTIAL`), totales (`PAID`) y finalización del préstamo (`COMPLETED`).
+- **`VoidPaymentUseCase`**: Reversión de pagos registrados (soft-void) restaurando estados de cuotas y devolviendo préstamos a `ACTIVE` si estaban `COMPLETED`.
+- **`GetPaymentDashboardUseCase`**: Consulta de dashboard agrupada en 3 secciones: `dueToday`, `overdue` y `paidToday`.
+- **`PaymentsModule`**: Módulo e infraestructura HTTP (`POST /api/payments`, `DELETE /api/payments/:id`, `GET /api/payments/dashboard`) desacoplada con controladores y DTOs validados.
+
+### Testing de esta etapa
+- Se implementaron **116 tests unitarios aislados** (`13 test suites` en verde) verificando exhaustivamente las lógicas de creación de préstamos, garantias, detalle, pagos FIFO, partial/paid status y reversión por anulación.
 
 ### Fase 9: Refinanciamiento (Simulación y Ejecución)
 - **Caso de uso (`CalculateRefinanceUseCase`)**: Tomar el saldo deudor actual (`outstandingBalance`), sumar capital adicional solicitado, calcular nuevo interés y simular las nuevas cuotas sin tocar la base de datos.

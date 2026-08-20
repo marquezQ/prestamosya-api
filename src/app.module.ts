@@ -7,6 +7,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { LoansModule } from './modules/loans/loans.module';
 import { GuaranteesModule } from './modules/guarantees/guarantees.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
@@ -16,6 +17,7 @@ import { PrismaModule } from './prisma/prisma.module';
     ClientsModule,
     LoansModule,
     GuaranteesModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [
