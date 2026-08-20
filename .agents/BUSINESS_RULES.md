@@ -36,10 +36,10 @@ Reglas de negocio que el agente debe respetar en todo momento.
 ## Mora y Cron Job
 
 > [!NOTE]
-> **El cron de mora aún NO está implementado.** Las cuotas se crean con `status: PENDING` y nadie las pasa a `OVERDUE` todavía. Implicaciones:
-> - `daysOverdue` queda siempre en 0 y ningún cliente llega a `DELINQUENT`.
-> - El campo `clients.status` (ClientStatus) solo pasa de `NO_LOAN` a `CURRENT` al crear el primer préstamo (ver `create-loan.use-case.ts`).
-> - Cuando se implemente el cron, la lógica que depende de cuotas `OVERDUE` funcionará sin cambios (p. ej. la futura detección de mora en el perfil de cliente).
+> **El cron de mora está 100% IMPLEMENTADO.** Se ejecuta automáticamente todos los días a las 6:00 AM (`America/La_Paz`) e incluye el endpoint de disparo manual de fallback `POST /api/admin/recalculate-overdue`.
+> - `daysOverdue` se calcula automáticamente según la fecha actual menos `dueDate`.
+> - Las cuotas activas vencidas pasan a `OVERDUE` respetando los `graceDays` de la configuración del negocio del administrador.
+> - Los clientes cambian automáticamente entre `CURRENT` y `DELINQUENT`.
 
 El cron corre a las **6:00 AM diario** con la expresión `@Cron('0 6 * * *')`.
 

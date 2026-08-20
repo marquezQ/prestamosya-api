@@ -132,6 +132,25 @@ PATCH  /api/config               → BusinessConfig
 POST   /api/admin/recalculate-overdue → forzar recálculo manual del cron de mora
 ```
 
+### Ejemplo de respuesta (`POST /api/admin/recalculate-overdue`):
+> No requiere body en el request.
+
+```json
+{
+  "data": {
+    "processedAt": "2026-08-20T18:45:00.000Z",
+    "todayReference": "2026-08-20",
+    "updatedInstallmentsCount": 5,
+    "markedDelinquentClientsCount": 2,
+    "restoredCurrentClientsCount": 1
+  },
+  "message": "Overdue recalculation completed successfully"
+}
+```
+
+> **Nota Swagger / Postman:** Al acceder a Swagger UI (`/api`) o importar la colección en Postman (`/api-json`), el endpoint aparece listado bajo la categoría **admin**.
+
+
 ---
 
 ## Health (público)

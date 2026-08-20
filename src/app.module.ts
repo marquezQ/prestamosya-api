@@ -8,6 +8,7 @@ import { ClientsModule } from './modules/clients/clients.module';
 import { LoansModule } from './modules/loans/loans.module';
 import { GuaranteesModule } from './modules/guarantees/guarantees.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { CronModule } from './modules/cron/cron.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
@@ -18,6 +19,7 @@ import { PrismaModule } from './prisma/prisma.module';
     LoansModule,
     GuaranteesModule,
     PaymentsModule,
+    CronModule,
   ],
   controllers: [AppController],
   providers: [
