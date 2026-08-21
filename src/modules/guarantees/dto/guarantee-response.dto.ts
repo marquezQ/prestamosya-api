@@ -4,6 +4,17 @@ import {
   GuaranteeType,
 } from '../../../generated/prisma/client';
 
+export class GuaranteePhotoDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty({ description: 'URL pública de la imagen en Cloudinary (WebP)' })
+  fileUrl: string;
+
+  @ApiProperty()
+  createdAt: Date;
+}
+
 export class GuaranteeResponseDto {
   @ApiProperty()
   id: string;
@@ -22,6 +33,9 @@ export class GuaranteeResponseDto {
 
   @ApiProperty({ enum: GuaranteeStatus })
   status: GuaranteeStatus;
+
+  @ApiProperty({ type: [GuaranteePhotoDto] })
+  photos: GuaranteePhotoDto[];
 
   @ApiProperty()
   createdAt: Date;

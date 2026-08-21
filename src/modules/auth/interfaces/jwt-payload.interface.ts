@@ -3,6 +3,7 @@
 // En V2 se podrá usar con RolesGuard cuando se agregue el rol cobrador.
 export interface JwtPayload {
   sub: string; // UUID del usuario (User.id)
+  name: string; // Nombre completo del usuario (User.name)
   username: string;
   role: string; // 'admin' | 'collector' — valores del enum Role de Prisma
 }

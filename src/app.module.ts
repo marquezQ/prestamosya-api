@@ -10,10 +10,12 @@ import { GuaranteesModule } from './modules/guarantees/guarantees.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { CronModule } from './modules/cron/cron.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
 
 @Module({
   imports: [
     PrismaModule,
+    CloudinaryModule,
     AuthModule,
     ClientsModule,
     LoansModule,

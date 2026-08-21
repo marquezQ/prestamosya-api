@@ -39,15 +39,27 @@ DELETE /api/clients/:id           → 200 OK (soft delete)
 ## Guarantees
 
 ```
-POST   /api/guarantees                         → Guarantee (clientId va en el body)
-GET    /api/guarantees?clientId=xxx            → Guarantee[]
-GET    /api/guarantees/:id                     → Guarantee
-PATCH  /api/guarantees/:id                     → Guarantee (clientId no editable)
+POST   /api/guarantees                         → Guarantee con photos[] (multipart/form-data)
+GET    /api/guarantees?clientId=xxx            → Guarantee[] con photos[]
+GET    /api/guarantees/:id                     → Guarantee con photos[]
+PATCH  /api/guarantees/:id                     → Guarantee con photos[] (multipart/form-data)
 DELETE /api/guarantees/:id                     → 200 OK (soft delete; bloqueado si IN_USE)
 ```
 
 > [!NOTE]
-> **Fotos de garantías NO implementadas.** La tabla `guarantee_photos` existe en BD pero no hay endpoints. Bloqueado hasta decidir proveedor de almacenamiento de archivos (Cloudinary/ImageKit — ver `STACK.md`).
+> **Subida de fotos a Cloudinary:**
+> - Los endpoints `POST /api/guarantees` y `PATCH /api/guarantees/:id` aceptan `multipart/form-data`.
+> - El campo de archivo es `image` (**opcional**).
+> - El backend valida la imagen (Formatos: JPG, PNG, WebP, GIF, BMP, TIFF; Tamaño máx: **20 MB**).
+> - Redimensiona con `sharp` a máximo **800x800 px** (preservando relación de aspecto) y convierte a formato **WebP**.
+> - Almacena en Cloudinary en la carpeta `{user.name}/garantias/` y guarda la URL en `guarantee_photos`.
+>
+> ### Cómo probar en Postman:
+> 1. En Postman, seleccionar la petición `POST` o `PATCH`.
+> 2. En la pestaña **Body**, seleccionar **form-data**.
+> 3. Agregar los campos de texto (`clientId`, `type`, `description`, `estimatedValue`).
+> 4. Agregar la clave `image`, cambiar el tipo de key de **Text** a **File**, y seleccionar un archivo de imagen.
+> 5. Enviar el request. La respuesta devolverá el objeto `Guarantee` incluyendo el array `photos` con la URL de Cloudinary.
 
 ---
 
