@@ -58,6 +58,7 @@ export class ClientsService {
       include: {
         guarantees: {
           where: { deletedAt: null },
+          include: { photos: true },
           orderBy: { createdAt: 'desc' },
         },
         loans: {
@@ -92,6 +93,10 @@ export class ClientsService {
             guarantee.status === GuaranteeStatus.IN_USE
               ? 'IN_USE'
               : 'AVAILABLE',
+          imageUrl:
+            guarantee.photos && guarantee.photos.length > 0
+              ? guarantee.photos[0].fileUrl
+              : null,
           createdAt: guarantee.createdAt,
         })),
       },

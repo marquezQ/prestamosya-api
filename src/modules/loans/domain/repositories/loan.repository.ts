@@ -32,4 +32,15 @@ export abstract class LoanRepository {
 
   /** Actualiza las propiedades mutables de un préstamo existente (saldo, estado, totalPaid). */
   abstract update(loan: LoanEntity): Promise<void>;
+
+  /**
+   * Busca un préstamo por ID con sus cuotas NO pagadas (status != PAID),
+   * ordenadas por dueDate ASC (la más antigua primero).
+   *
+   * Usado por RegisterPaymentUseCase para distribuir el pago en orden FIFO.
+   * Excluye cuotas archivadas y cuotas ya pagadas completamente.
+   */
+  abstract findByIdWithPendingInstallments(
+    id: string,
+  ): Promise<LoanEntity | null>;
 }

@@ -86,14 +86,30 @@ La primera etapa de construcción estableció los cimientos y el flujo completo 
 Las siguientes fases deben desarrollarse para dar por concluido completamente el módulo financiero.
 
 ### Fase 8: Flujos de Pago (Payment integration)
-- Aunque los pagos vivirán en su propio módulo (`payments`), el dominio de `loans` necesita la lógica para reaccionar a un pago.
-- **Requerido**: Añadir métodos en `LoanEntity` e `InstallmentEntity` para aplicar pagos parciales o totales y cambiar estados dinámicamente (`PENDING` -> `PARTIAL` -> `PAID`).
+- **`PaymentRepository` & `PrismaPaymentRepository`**: Abstracción e infraestructura para persistir pagos (`payments`) y enlaces a cuotas (`payment_installments`).
+- **`UnitOfWork` extendido**: Transaccionalidad atómica asegurada entre `loans`, `installments` y `payments`.
+- **`RegisterPaymentUseCase`**: Distribución automática de montos en orden FIFO (`dueDate ASC`) entre cuotas pendientes usando el patrón surplus de `InstallmentEntity.applyPayment()`. Manejo de pagos parciales (`PARTIAL`), totales (`PAID`) y finalización del préstamo (`COMPLETED`).
+- **`VoidPaymentUseCase`**: Reversión de pagos registrados (soft-void) restaurando estados de cuotas y devolviendo préstamos a `ACTIVE` si estaban `COMPLETED`.
+- **`GetPaymentDashboardUseCase`**: Consulta de dashboard agrupada en 3 secciones: `dueToday`, `overdue` y `paidToday`.
+- **`PaymentsModule`**: Módulo e infraestructura HTTP (`POST /api/payments`, `DELETE /api/payments/:id`, `GET /api/payments/dashboard`) desacoplada con controladores y DTOs validados.
+
+### Fase 10: Cron Job de Mora y Recálculo Manual
+- **`OverdueProcessorService`**: Servicio centralizado que calcula de forma idempotente las cuotas vencidas (`dueDate < hoy - graceDays`), actualiza `daysOverdue`, pasa cuotas sin pagar a `OVERDUE`, y conmuta el estado de los clientes entre `CURRENT` y `DELINQUENT`.
+- **`OverdueCron`**: Tarea programada `@nestjs/schedule` con `@Cron('0 6 * * *', { timeZone: 'America/La_Paz' })` ejecutada automáticamente todos los días a las 6:00 AM.
+- **`CronController` (`POST /api/admin/recalculate-overdue`)**: Endpoint de respaldo administrativo para forzar la actualización síncrona en cualquier momento.
+- **Zona Horaria Global**: Proceso Node configurado con `process.env.TZ = 'America/La_Paz'` en `main.ts` y utilidades de fecha en `src/common/utils/date.utils.ts`.
+
+### Testing de esta etapa
+- Se implementaron **118 tests unitarios aislados** (`14 test suites` en verde) verificando recálculo diario, idempotencia, estados de cliente y flujo de mora.
+
+---
+
+## Fases Pendientes (Roadmap Futuro)
 
 ### Fase 9: Refinanciamiento (Simulación y Ejecución)
 - **Caso de uso (`CalculateRefinanceUseCase`)**: Tomar el saldo deudor actual (`outstandingBalance`), sumar capital adicional solicitado, calcular nuevo interés y simular las nuevas cuotas sin tocar la base de datos.
 - **Caso de uso (`ExecuteRefinanceUseCase`)**: Guardar snapshot en `loan_refinances`, archivar cuotas anteriores y crear el nuevo cronograma atómicamente.
 
-### Fase 10: Cron Job de Mora y E2E
-- **Integración con Clientes**: El perfil `GET /api/clients/:id` ya agrupa préstamos en `activeLoans`/`completedLoans` (resúmenes sin cuotas; el cronograma se carga con `GET /api/loans/:id`). El *resumen financiero* se descartó por decisión de producto.
-- **Cron Job de Mora**: `@nestjs/schedule` diario a las 6:00 AM. Aún no implementado — hasta que exista, ninguna cuota pasa a `OVERDUE` y `clients.status` solo cambia `NO_LOAN → CURRENT`.
+### Testing E2E
 - **E2E Testing**: Suite End-to-End con BD real de test (`test/loans.e2e-spec.ts` y `test/guarantees.e2e-spec.ts`). Cubre creación automática/manual (verificando la fórmula flat-rate y `firstDueDate`), simulación, detalle/cuotas, validaciones, aislamiento entre admins y el ciclo AVAILABLE → IN_USE → AVAILABLE de garantías.
+

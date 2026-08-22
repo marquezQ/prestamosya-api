@@ -4,14 +4,19 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { LoanCalculatorService } from './domain/services/loan-calculator.service';
 import { LoanRepository } from './domain/repositories/loan.repository';
 import { InstallmentRepository } from './domain/repositories/installment.repository';
+import { PaymentRepository } from './domain/repositories/payment.repository';
 import { UnitOfWork } from './application/ports/unit-of-work.port';
 import { CreateLoanUseCase } from './application/use-cases/create-loan.use-case';
 import { SimulateLoanUseCase } from './application/use-cases/simulate-loan.use-case';
 import { LinkGuaranteeUseCase } from './application/use-cases/link-guarantee.use-case';
 import { UnlinkGuaranteeUseCase } from './application/use-cases/unlink-guarantee.use-case';
 import { GetLoanDetailUseCase } from './application/use-cases/get-loan-detail.use-case';
+import { RegisterPaymentUseCase } from './application/use-cases/register-payment.use-case';
+import { VoidPaymentUseCase } from './application/use-cases/void-payment.use-case';
+import { GetPaymentDashboardUseCase } from './application/use-cases/get-payment-dashboard.use-case';
 import { PrismaLoanRepository } from './infrastructure/repositories/prisma-loan.repository';
 import { PrismaInstallmentRepository } from './infrastructure/repositories/prisma-installment.repository';
+import { PrismaPaymentRepository } from './infrastructure/repositories/prisma-payment.repository';
 import { PrismaUnitOfWork } from './infrastructure/prisma-unit-of-work';
 import { LoansController } from './infrastructure/loans.controller';
 
@@ -25,6 +30,9 @@ import { LoansController } from './infrastructure/loans.controller';
     LinkGuaranteeUseCase,
     UnlinkGuaranteeUseCase,
     GetLoanDetailUseCase,
+    RegisterPaymentUseCase,
+    VoidPaymentUseCase,
+    GetPaymentDashboardUseCase,
     // useFactory garantiza que PrismaService se inyecta explícitamente.
     // No podemos usar useClass porque el constructor recibe PrismaClientLike
     // (type alias), que TypeScript compila a `Object` en reflect-metadata
@@ -41,15 +49,25 @@ import { LoansController } from './infrastructure/loans.controller';
       inject: [PrismaService],
     },
     {
+      provide: PaymentRepository,
+      useFactory: (prisma: PrismaService) =>
+        new PrismaPaymentRepository(prisma),
+      inject: [PrismaService],
+    },
+    {
       provide: UnitOfWork,
       useClass: PrismaUnitOfWork,
     },
   ],
   exports: [
     CreateLoanUseCase,
+    RegisterPaymentUseCase,
+    VoidPaymentUseCase,
+    GetPaymentDashboardUseCase,
     UnitOfWork,
     LoanRepository,
     InstallmentRepository,
+    PaymentRepository,
   ],
 })
 export class LoansModule {}

@@ -12,7 +12,7 @@ Stack tecnológico, infraestructura, variables de entorno y decisiones técnicas
 | ORM | Prisma |
 | Base de datos | PostgreSQL 16 |
 | Autenticación | JWT + Refresh Tokens |
-| Almacenamiento de archivos | **POR DECIDIR** — Cloudinary, ImageKit u otro servicio gratuito/freemium. No implementar hasta que se tome la decisión. |
+| Almacenamiento de archivos | Cloudinary — imágenes de garantías. Optimizadas a WebP (max 1200px, quality 80) con `sharp` antes de subir. Carpeta: `{user.name}/garantias/` (nombre completo del usuario, no username) |
 | Tareas programadas | @nestjs/schedule |
 | Validación | class-validator + class-transformer |
 | Documentación | Swagger (OpenAPI) en `/api/docs` |
@@ -38,9 +38,10 @@ JWT_REFRESH_EXPIRES_IN=30d
 PORT=3000
 NODE_ENV=development
 
-# Almacenamiento de archivos — POR DECIDIR, no implementar aún
-# FILE_STORAGE_PROVIDER=
-# FILE_STORAGE_API_KEY=
+# Cloudinary — Almacenamiento de imágenes de garantías
+CLOUDINARY_CLOUD_NAME=tu_cloud_name
+CLOUDINARY_API_KEY=tu_api_key
+CLOUDINARY_API_SECRET=tu_api_secret
 ```
 
 ---
@@ -141,7 +142,7 @@ pnpm run build
 
 | Decisión | Opciones en evaluación | Bloqueado hasta |
 |----------|----------------------|-----------------|
-| Almacenamiento de archivos | Cloudinary, ImageKit, u otro freemium | Antes de implementar guarantees/photos |
+| Almacenamiento de archivos | Cloudinary, ImageKit, u otro freemium | **DECIDIDO: Cloudinary** |
 | Framework de testing | Por definir | Antes de escribir el primer test |
 | Clean Architecture en payments | Aplicar parcialmente | Si la complejidad del módulo lo requiere a futuro |
 

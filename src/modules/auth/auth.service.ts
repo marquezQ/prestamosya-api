@@ -36,6 +36,7 @@ export class AuthService {
     // Firmar JWT y retornar datos de sesión (excluyendo passwordHash)
     const payload: JwtPayload = {
       sub: user.id,
+      name: user.name,
       username: user.username,
       role: user.role,
     };

@@ -1,5 +1,6 @@
 import { LoanRepository } from '../../domain/repositories/loan.repository';
 import { InstallmentRepository } from '../../domain/repositories/installment.repository';
+import { PaymentRepository } from '../../domain/repositories/payment.repository';
 
 /**
  * Interface/Puerto para el patrón Unit of Work.
@@ -22,6 +23,7 @@ export abstract class UnitOfWork {
     work: (repos: {
       loans: LoanRepository;
       installments: InstallmentRepository;
+      payments: PaymentRepository;
     }) => Promise<T>,
   ): Promise<T>;
 }

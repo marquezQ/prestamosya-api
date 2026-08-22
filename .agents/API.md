@@ -27,27 +27,39 @@ POST   /api/auth/logout          → { message }                        [protegi
 ```
 GET    /api/clients               → Client[] (cada item incluye activeLoanCount; status = ClientStatus del DB)
 POST   /api/clients               → Client
-GET    /api/clients/:id           → ClientProfile { client, activeLoans[], completedLoans[], guarantees[] }
+GET    /api/clients/:id           → ClientProfile { client, activeLoans[], completedLoans[], guarantees[ con imageUrl ] }
 PATCH  /api/clients/:id           → Client
 DELETE /api/clients/:id           → 200 OK (soft delete)
 ```
 
-> **Perfil de cliente (`GET /api/clients/:id`):** los préstamos se agrupan en `activeLoans` (`status: ACTIVE`) y `completedLoans` (`COMPLETED` | `DEFAULTED` | `REFINANCED`). Cada préstamo es un **resumen** (sin cuotas ni pagos). Para ver el cronograma completo se llama a `GET /api/loans/:id`. No existe resumen financiero ni `nextInstallment` en este endpoint.
+> **Perfil de cliente (`GET /api/clients/:id`):** los préstamos se agrupan en `activeLoans` (`status: ACTIVE`) y `completedLoans` (`COMPLETED` | `DEFAULTED` | `REFINANCED`). Cada garantía incluye su campo `imageUrl: string | null`, ideal para renderizar de inmediato la foto/miniatura en las tarjetas (cards) de garantía sin hacer peticiones adicionales.
 
 ---
 
 ## Guarantees
 
 ```
-POST   /api/guarantees                         → Guarantee (clientId va en el body)
-GET    /api/guarantees?clientId=xxx            → Guarantee[]
-GET    /api/guarantees/:id                     → Guarantee
-PATCH  /api/guarantees/:id                     → Guarantee (clientId no editable)
+POST   /api/guarantees                         → Guarantee con imageUrl (multipart/form-data)
+GET    /api/guarantees?clientId=xxx            → Guarantee[] con imageUrl
+GET    /api/guarantees/:id                     → Guarantee con imageUrl
+PATCH  /api/guarantees/:id                     → Guarantee con imageUrl (multipart/form-data)
 DELETE /api/guarantees/:id                     → 200 OK (soft delete; bloqueado si IN_USE)
 ```
 
 > [!NOTE]
-> **Fotos de garantías NO implementadas.** La tabla `guarantee_photos` existe en BD pero no hay endpoints. Bloqueado hasta decidir proveedor de almacenamiento de archivos (Cloudinary/ImageKit — ver `STACK.md`).
+> **Subida de fotos a Cloudinary:**
+> - Los endpoints `POST /api/guarantees` y `PATCH /api/guarantees/:id` aceptan `multipart/form-data`.
+> - El campo de archivo es `image` (**opcional**).
+> - El backend valida la imagen (Formatos: JPG, PNG, WebP, GIF, BMP, TIFF; Tamaño máx: **20 MB**).
+> - Redimensiona con `sharp` a máximo **800x800 px** (preservando relación de aspecto) y convierte a formato **WebP**.
+> - Almacena en Cloudinary en la carpeta `{user.name}/garantias/` y devuelve la URL directa en `imageUrl`.
+>
+> ### Cómo probar en Postman:
+> 1. En Postman, seleccionar la petición `POST` o `PATCH`.
+> 2. En la pestaña **Body**, seleccionar **form-data**.
+> 3. Agregar los campos de texto (`clientId`, `type`, `description`, `estimatedValue`).
+> 4. Agregar la clave `image`, cambiar el tipo de key de **Text** a **File**, y seleccionar un archivo de imagen.
+> 5. Enviar el request. La respuesta devolverá el objeto `Guarantee` con la propiedad `imageUrl` con la URL de Cloudinary (o `null` si no tiene foto).
 
 ---
 
@@ -70,10 +82,38 @@ POST   /api/loans/:id/refinance               → LoanRefinance + nuevas Install
 ## Payments
 
 ```
-POST   /api/payments             → Payment + PaymentInstallment[]
-GET    /api/loans/:id/payments   → Payment[]
-DELETE /api/payments/:id         → 200 OK (anular, requiere void_reason en body)
+GET    /api/payments/dashboard?date=2026-08-20  → { metadata: { targetDate, serverToday }, dueToday[], overdue[], paidToday[] }
+POST   /api/payments                            → RegisterPaymentResult (aplica pago FIFO)
+DELETE /api/payments/:id                        → 200 OK (anular pago, requiere { reason } en body)
 ```
+
+> **Dashboard Dinámico de Pagos:** El parámetro `?date=YYYY-MM-DD` es opcional. Permite navegar por la agenda/carrusel de fechas de la UI. Si se omite, asume la fecha actual del servidor (`serverToday`). devuelven metadatos con la fecha consultada (`targetDate`) y la fecha real del servidor (`serverToday`).
+
+### Ejemplos de Body JSON para Postman:
+
+**1. Registrar un pago (`POST /api/payments`)**
+
+```json
+{
+  "loanId": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
+  "amount": 500.0,
+  "method": "cash",
+  "paymentDate": "2026-08-19",
+  "notes": "Pago entregado en mano"
+}
+```
+
+> `method` acepta: `"cash"`, `"transfer"`, `"qr"`. `paymentDate` formato: `YYYY-MM-DD`.
+
+**2. Anular un pago (`DELETE /api/payments/:id`)**
+
+```json
+{
+  "reason": "Error en el monto digitado"
+}
+```
+
+> **Nota Swagger / Postman:** Los DTOs tienen decoradores `@ApiProperty` con `default` configurados. Al acceder a `/api` (Swagger UI) o `/api-json` (para importar la colección a Postman), los cuerpos de solicitud se autocompletan con estos valores de ejemplo.
 
 ---
 
@@ -107,6 +147,25 @@ PATCH  /api/config               → BusinessConfig
 ```
 POST   /api/admin/recalculate-overdue → forzar recálculo manual del cron de mora
 ```
+
+### Ejemplo de respuesta (`POST /api/admin/recalculate-overdue`):
+
+> No requiere body en el request.
+
+```json
+{
+  "data": {
+    "processedAt": "2026-08-20T18:45:00.000Z",
+    "todayReference": "2026-08-20",
+    "updatedInstallmentsCount": 5,
+    "markedDelinquentClientsCount": 2,
+    "restoredCurrentClientsCount": 1
+  },
+  "message": "Overdue recalculation completed successfully"
+}
+```
+
+> **Nota Swagger / Postman:** Al acceder a Swagger UI (`/api`) o importar la colección en Postman (`/api-json`), el endpoint aparece listado bajo la categoría **admin**.
 
 ---
 

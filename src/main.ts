@@ -1,4 +1,8 @@
 import 'dotenv/config';
+
+// ─── Configuración global de Zona Horaria (America/La_Paz: UTC-4) ─────────
+process.env.TZ = process.env.TZ || 'America/La_Paz';
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule, OpenAPIObject } from '@nestjs/swagger';

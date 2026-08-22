@@ -20,6 +20,7 @@ export interface PrismaServiceMock {
     create: jest.Mock;
     findMany: jest.Mock;
     findFirst: jest.Mock;
+    findUnique: jest.Mock;
     update: jest.Mock;
   };
   loan: {
@@ -40,7 +41,7 @@ export interface PrismaServiceMock {
 
 /** Fábrica de un mock limpio de PrismaService: cada `jest.fn()` es nuevo. */
 export function createPrismaMock(): PrismaServiceMock {
-  return {
+  const mock: PrismaServiceMock = {
     user: {
       findUnique: jest.fn(),
     },
@@ -56,6 +57,7 @@ export function createPrismaMock(): PrismaServiceMock {
       create: jest.fn(),
       findMany: jest.fn(),
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
       update: jest.fn(),
     },
     loan: {
@@ -69,10 +71,17 @@ export function createPrismaMock(): PrismaServiceMock {
       findFirst: jest.fn(),
       update: jest.fn(),
     },
-    $transaction: jest.fn(),
+    $transaction: jest.fn().mockImplementation((arg: unknown) => {
+      if (typeof arg === 'function') {
+        const fn = arg as (tx: PrismaServiceMock) => unknown;
+        return fn(mock);
+      }
+      return arg;
+    }),
     $connect: jest.fn(),
     $disconnect: jest.fn(),
   };
+  return mock;
 }
 
 /** Convierte el mock en el tipo PrismaService para inyectarlo en un service. */

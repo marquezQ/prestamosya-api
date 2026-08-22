@@ -78,6 +78,7 @@ describe('AuthService', () => {
 
       expect(jwtSign).toHaveBeenCalledWith({
         sub: 'user-1',
+        name: 'Admin Uno',
         username: 'admin',
         role: 'admin',
       });

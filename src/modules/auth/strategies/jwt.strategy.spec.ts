@@ -20,6 +20,7 @@ describe('JwtStrategy', () => {
     it('devuelve el payload cuando contiene sub', () => {
       const payload: JwtPayload = {
         sub: 'user-1',
+        name: 'Admin Uno',
         username: 'admin',
         role: 'admin',
       };

@@ -39,7 +39,7 @@ Este repositorio es exclusivamente el backend. El frontend vive en `prestamosya-
 
 5. **Usar `prisma.$transaction`** siempre que una operación modifique más de una tabla.
 
-6. **No implementar almacenamiento de archivos** hasta que se tome la decisión de proveedor (Cloudinary, ImageKit u otro). Ver `STACK.md`.
+6. **Cloudinary** es el proveedor de almacenamiento de imágenes. `CloudinaryService` en `src/common/cloudinary/` — inyectable globalmente. Las imágenes se optimizan con `sharp` (WebP, max 1200px, quality 80) antes de subir. Carpeta en Cloudinary: `{user.name}/garantias/` (usando el nombre completo del usuario, no el username). Ver `STACK.md`.
 
 7. **No implementar tests** hasta que se decida el framework. Ver `TESTING.md`.
 
