@@ -32,8 +32,8 @@ import { GuaranteesService } from './guarantees.service';
 /** 20 MB en bytes — cubre fotos de alta resolución de smartphones modernos. Sharp optimiza antes de subir. */
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
 
-/** Tipos MIME de imagen válidos. */
-const VALID_IMAGE_MIME_TYPES = /^image\/(jpeg|jpg|png|webp|gif|bmp|tiff)$/;
+/** Tipos MIME de imagen válidos (incluyendo heic/heif de móviles y octet-stream). */
+const VALID_IMAGE_MIME_TYPES = /(image\/|application\/octet-stream)/i;
 
 /** ParseFilePipe reutilizable: valida tipo MIME y tamaño máximo. Opcional (fileIsRequired: false). */
 function buildImagePipe() {
@@ -44,6 +44,28 @@ function buildImagePipe() {
     ],
     fileIsRequired: false,
   });
+}
+
+function extractBuffer(
+  image?: Express.Multer.File,
+  dtoImage?: unknown,
+): Buffer | undefined {
+  if (image?.buffer && Buffer.isBuffer(image.buffer)) {
+    return image.buffer;
+  }
+  if (
+    dtoImage &&
+    typeof dtoImage === 'object' &&
+    dtoImage !== null &&
+    'buffer' in dtoImage
+  ) {
+    const b = dtoImage.buffer;
+    if (Buffer.isBuffer(b)) return b;
+  }
+  if (Buffer.isBuffer(dtoImage)) {
+    return dtoImage;
+  }
+  return undefined;
 }
 
 @ApiTags('guarantees')
@@ -60,11 +82,13 @@ export class GuaranteesController {
     @Body() dto: CreateGuaranteeDto,
     @UploadedFile(buildImagePipe()) image?: Express.Multer.File,
   ) {
+    const buffer = extractBuffer(image, dto.image);
+
     const data = await this.guaranteesService.create(
       user.sub,
       user.name,
       dto,
-      image?.buffer,
+      buffer,
     );
     return { data, message: 'Guarantee created successfully' };
   }
@@ -96,12 +120,14 @@ export class GuaranteesController {
     @Body() dto: UpdateGuaranteeDto,
     @UploadedFile(buildImagePipe()) image?: Express.Multer.File,
   ) {
+    const buffer = extractBuffer(image, dto.image);
+
     const data = await this.guaranteesService.update(
       user.sub,
       user.name,
       id,
       dto,
-      image?.buffer,
+      buffer,
     );
     return { data, message: 'Guarantee updated successfully' };
   }

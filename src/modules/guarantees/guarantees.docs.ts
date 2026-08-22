@@ -69,7 +69,7 @@ export function ApiGetGuaranteesByClientDoc() {
       summary: 'Listar garantías de un cliente',
       description:
         'Obtiene la lista de garantías activas de un cliente específico. ' +
-        'Cada garantía incluye su array de fotos (puede estar vacío).',
+        'Cada garantía incluye la propiedad `imageUrl` (URL de la foto o null).',
     }),
     ApiQuery({
       name: 'clientId',

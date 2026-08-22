@@ -27,22 +27,22 @@ POST   /api/auth/logout          → { message }                        [protegi
 ```
 GET    /api/clients               → Client[] (cada item incluye activeLoanCount; status = ClientStatus del DB)
 POST   /api/clients               → Client
-GET    /api/clients/:id           → ClientProfile { client, activeLoans[], completedLoans[], guarantees[] }
+GET    /api/clients/:id           → ClientProfile { client, activeLoans[], completedLoans[], guarantees[ con imageUrl ] }
 PATCH  /api/clients/:id           → Client
 DELETE /api/clients/:id           → 200 OK (soft delete)
 ```
 
-> **Perfil de cliente (`GET /api/clients/:id`):** los préstamos se agrupan en `activeLoans` (`status: ACTIVE`) y `completedLoans` (`COMPLETED` | `DEFAULTED` | `REFINANCED`). Cada préstamo es un **resumen** (sin cuotas ni pagos). Para ver el cronograma completo se llama a `GET /api/loans/:id`. No existe resumen financiero ni `nextInstallment` en este endpoint.
+> **Perfil de cliente (`GET /api/clients/:id`):** los préstamos se agrupan en `activeLoans` (`status: ACTIVE`) y `completedLoans` (`COMPLETED` | `DEFAULTED` | `REFINANCED`). Cada garantía incluye su campo `imageUrl: string | null`, ideal para renderizar de inmediato la foto/miniatura en las tarjetas (cards) de garantía sin hacer peticiones adicionales.
 
 ---
 
 ## Guarantees
 
 ```
-POST   /api/guarantees                         → Guarantee con photos[] (multipart/form-data)
-GET    /api/guarantees?clientId=xxx            → Guarantee[] con photos[]
-GET    /api/guarantees/:id                     → Guarantee con photos[]
-PATCH  /api/guarantees/:id                     → Guarantee con photos[] (multipart/form-data)
+POST   /api/guarantees                         → Guarantee con imageUrl (multipart/form-data)
+GET    /api/guarantees?clientId=xxx            → Guarantee[] con imageUrl
+GET    /api/guarantees/:id                     → Guarantee con imageUrl
+PATCH  /api/guarantees/:id                     → Guarantee con imageUrl (multipart/form-data)
 DELETE /api/guarantees/:id                     → 200 OK (soft delete; bloqueado si IN_USE)
 ```
 
@@ -52,14 +52,14 @@ DELETE /api/guarantees/:id                     → 200 OK (soft delete; bloquead
 > - El campo de archivo es `image` (**opcional**).
 > - El backend valida la imagen (Formatos: JPG, PNG, WebP, GIF, BMP, TIFF; Tamaño máx: **20 MB**).
 > - Redimensiona con `sharp` a máximo **800x800 px** (preservando relación de aspecto) y convierte a formato **WebP**.
-> - Almacena en Cloudinary en la carpeta `{user.name}/garantias/` y guarda la URL en `guarantee_photos`.
+> - Almacena en Cloudinary en la carpeta `{user.name}/garantias/` y devuelve la URL directa en `imageUrl`.
 >
 > ### Cómo probar en Postman:
 > 1. En Postman, seleccionar la petición `POST` o `PATCH`.
 > 2. En la pestaña **Body**, seleccionar **form-data**.
 > 3. Agregar los campos de texto (`clientId`, `type`, `description`, `estimatedValue`).
 > 4. Agregar la clave `image`, cambiar el tipo de key de **Text** a **File**, y seleccionar un archivo de imagen.
-> 5. Enviar el request. La respuesta devolverá el objeto `Guarantee` incluyendo el array `photos` con la URL de Cloudinary.
+> 5. Enviar el request. La respuesta devolverá el objeto `Guarantee` con la propiedad `imageUrl` con la URL de Cloudinary (o `null` si no tiene foto).
 
 ---
 

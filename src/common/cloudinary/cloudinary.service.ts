@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 // sharp exporta un default callable — con moduleResolution Node y CJS se importa así:
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -10,6 +14,8 @@ const IMAGE_QUALITY = 80;
 
 @Injectable()
 export class CloudinaryService {
+  private readonly logger = new Logger(CloudinaryService.name);
+
   constructor() {
     cloudinary.config({
       cloud_name: process.env['CLOUDINARY_CLOUD_NAME'],
@@ -22,13 +28,21 @@ export class CloudinaryService {
    * Optimiza un buffer de imagen (resize + conversión a WebP) y lo sube a Cloudinary.
    *
    * @param buffer   Buffer original de la imagen recibida del cliente.
-   * @param folder   Carpeta destino dentro de Cloudinary (ej: "johnadmin/garantias").
+   * @param folder   Carpeta destino dentro de Cloudinary (ej: "John Perez/garantias").
    * @returns        URL segura de la imagen subida.
    */
   async uploadImage(buffer: Buffer, folder: string): Promise<string> {
-    const optimized = await this.optimizeToWebp(buffer);
-    const result = await this.uploadToCloudinary(optimized, folder);
-    return result.secure_url;
+    try {
+      const optimized = await this.optimizeToWebp(buffer);
+      const result = await this.uploadToCloudinary(optimized, folder);
+      return result.secure_url;
+    } catch (error) {
+      this.logger.error(
+        `Error al procesar o subir imagen a Cloudinary: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw error;
+    }
   }
 
   // ─── Privados ──────────────────────────────────────────────────────────────
@@ -69,6 +83,9 @@ export class CloudinaryService {
         },
         (error, result) => {
           if (error || !result) {
+            this.logger.error(
+              `Error de Cloudinary SDK: ${error?.message ?? 'resultado vacío'}`,
+            );
             reject(
               new InternalServerErrorException(
                 `Error al subir imagen a Cloudinary: ${error?.message ?? 'resultado vacío'}`,

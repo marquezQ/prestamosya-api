@@ -21,7 +21,7 @@ export class GuaranteesService {
 
   async create(
     userId: string,
-    username: string,
+    name: string,
     dto: CreateGuaranteeDto,
     imageBuffer?: Buffer,
   ) {
@@ -35,7 +35,7 @@ export class GuaranteesService {
 
     // Si viene imagen, subirla a Cloudinary antes de la transacción BD
     const imageUrl = imageBuffer
-      ? await this.uploadGuaranteeImage(imageBuffer, username)
+      ? await this.uploadGuaranteeImage(imageBuffer, name)
       : null;
 
     const guarantee = await this.prisma.$transaction(async (tx) => {
@@ -62,7 +62,6 @@ export class GuaranteesService {
       });
     });
 
-    // guarantee no puede ser null porque acabamos de crearlo
     return this.formatGuarantee(guarantee!);
   }
 
@@ -103,12 +102,11 @@ export class GuaranteesService {
 
   async update(
     userId: string,
-    username: string,
+    name: string,
     id: string,
     dto: UpdateGuaranteeDto,
     imageBuffer?: Buffer,
   ) {
-    // Verifica propiedad y obtiene la foto actual si existe
     const existing = await this.prisma.guarantee.findFirst({
       where: {
         id,
@@ -122,9 +120,8 @@ export class GuaranteesService {
       throw new NotFoundException('Guarantee not found');
     }
 
-    // Si viene imagen, subir a Cloudinary primero
     const imageUrl = imageBuffer
-      ? await this.uploadGuaranteeImage(imageBuffer, username)
+      ? await this.uploadGuaranteeImage(imageBuffer, name)
       : null;
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -146,13 +143,11 @@ export class GuaranteesService {
         const [existingPhoto] = existing.photos;
 
         if (existingPhoto) {
-          // Reemplazar la URL de la foto existente
           await tx.guaranteePhoto.update({
             where: { id: existingPhoto.id },
             data: { fileUrl: imageUrl },
           });
         } else {
-          // No había foto previa: crear una nueva
           await tx.guaranteePhoto.create({
             data: { guaranteeId: id, fileUrl: imageUrl },
           });
@@ -197,17 +192,13 @@ export class GuaranteesService {
 
   // ─── Helpers privados ─────────────────────────────────────────────────────
 
-  /**
-   * Construye la carpeta Cloudinary por usuario usando su nombre completo
-   * y sube la imagen optimizada.
-   * Estructura: {name}/garantias/
-   */
   private uploadGuaranteeImage(buffer: Buffer, name: string): Promise<string> {
     const folder = `${name}/${CLOUDINARY_BASE_FOLDER}`;
     return this.cloudinary.uploadImage(buffer, folder);
   }
 
   private formatGuarantee(g: Guarantee & { photos: GuaranteePhoto[] }) {
+    const firstPhoto = g.photos[0];
     return {
       id: g.id,
       clientId: g.clientId,
@@ -215,11 +206,7 @@ export class GuaranteesService {
       description: g.description,
       estimatedValue: g.estimatedValue ? Number(g.estimatedValue) : null,
       status: g.status,
-      photos: g.photos.map((p) => ({
-        id: p.id,
-        fileUrl: p.fileUrl,
-        createdAt: p.createdAt,
-      })),
+      imageUrl: firstPhoto ? firstPhoto.fileUrl : null,
       createdAt: g.createdAt,
       updatedAt: g.updatedAt,
     };

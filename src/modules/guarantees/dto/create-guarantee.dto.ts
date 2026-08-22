@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsEnum,
   IsNotEmpty,
@@ -40,7 +41,16 @@ export class CreateGuaranteeDto {
     example: 1500,
   })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   estimatedValue?: number;
+
+  @ApiPropertyOptional({
+    description: 'Campo de imagen para multipart/form-data',
+    type: 'string',
+    format: 'binary',
+  })
+  @IsOptional()
+  image?: unknown;
 }

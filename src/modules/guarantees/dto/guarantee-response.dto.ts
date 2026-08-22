@@ -4,17 +4,6 @@ import {
   GuaranteeType,
 } from '../../../generated/prisma/client';
 
-export class GuaranteePhotoDto {
-  @ApiProperty()
-  id: string;
-
-  @ApiProperty({ description: 'URL pública de la imagen en Cloudinary (WebP)' })
-  fileUrl: string;
-
-  @ApiProperty()
-  createdAt: Date;
-}
-
 export class GuaranteeResponseDto {
   @ApiProperty()
   id: string;
@@ -34,8 +23,13 @@ export class GuaranteeResponseDto {
   @ApiProperty({ enum: GuaranteeStatus })
   status: GuaranteeStatus;
 
-  @ApiProperty({ type: [GuaranteePhotoDto] })
-  photos: GuaranteePhotoDto[];
+  @ApiPropertyOptional({
+    description:
+      'URL pública de la imagen en Cloudinary (WebP) o null si la garantía no tiene foto',
+    example:
+      'https://res.cloudinary.com/demo/image/upload/v123456/Juan%20Perez/garantias/sample.webp',
+  })
+  imageUrl: string | null;
 
   @ApiProperty()
   createdAt: Date;
