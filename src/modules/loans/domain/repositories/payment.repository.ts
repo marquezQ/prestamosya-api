@@ -13,7 +13,7 @@ export interface CreatePaymentData {
   registeredBy: string; // userId del admin que registra el pago
   amount: string; // Decimal como string (ej: "500.00")
   paymentDate: Date;
-  method: 'cash' | 'transfer' | 'qr';
+  method: 'cash' | 'transfer';
   notes: string | null;
   installmentLinks: Array<{
     installmentId: string;

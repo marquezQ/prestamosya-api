@@ -11,7 +11,7 @@ import { UnitOfWork } from '../ports/unit-of-work.port';
 export interface RegisterPaymentInput {
   loanId: string;
   amount: number;
-  method: 'cash' | 'transfer' | 'qr';
+  method: 'cash' | 'transfer';
   paymentDate: string; // YYYY-MM-DD
   notes?: string;
 }

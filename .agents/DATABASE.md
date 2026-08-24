@@ -83,7 +83,7 @@ enum InstallmentStatus {
 enum PaymentMethod {
   cash
   transfer
-  qr
+  qr     // Deprecado: la app solo acepta cash y transfer. qr permanece en DB por compatibilidad.
 }
 
 enum ClientStatus {

@@ -24,10 +24,10 @@ export class RegisterPaymentDto {
   @Max(999999.99)
   amount: number;
 
-  @ApiProperty({ default: 'cash', enum: ['cash', 'transfer', 'qr'] })
+  @ApiProperty({ default: 'cash', enum: ['cash', 'transfer'] })
   @IsString()
-  @IsIn(['cash', 'transfer', 'qr'])
-  method: 'cash' | 'transfer' | 'qr';
+  @IsIn(['cash', 'transfer'])
+  method: 'cash' | 'transfer';
 
   @ApiProperty({ default: '2026-08-19' })
   @IsString()
