@@ -5,6 +5,7 @@ import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
+import { LA_PAZ_TIMEZONE } from '../common/utils/date.utils';
 
 @Injectable()
 export class PrismaService
@@ -12,9 +13,14 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   constructor() {
-    // Crear pool de conexiones con el driver nativo de pg
+    // Pool de conexiones con el driver nativo de pg. La zona horaria boliviana se
+    // fija vía `options` (parámetro de conexión de PostgreSQL), que la aplica al
+    // establecer la conexión — sin condición de carrera. Esto asegura que cualquier
+    // valor de timestamps del lado DB (`CURRENT_TIMESTAMP`, `now()`) y los
+    // SELECTs con formato de texto se resuelvan en America/La_Paz.
     const pool = new Pool({
       connectionString: process.env.DATABASE_URL,
+      options: `-c timezone=${LA_PAZ_TIMEZONE}`,
     });
 
     // Crear el adapter de Prisma para pg

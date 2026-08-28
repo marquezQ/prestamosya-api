@@ -15,8 +15,8 @@ model User {
   passwordHash   String          @map("password_hash") @db.VarChar(255)
   role           Role            @default(admin)
   isActive       Boolean         @default(true) @map("is_active")
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt      DateTime        @updatedAt @db.Timestamptz(3) @map("updated_at")
   businessConfig BusinessConfig?
   clients        Client[]
   loans          Loan[]
@@ -30,9 +30,9 @@ model SessionToken {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
   tokenHash String   @map("token_hash") @db.VarChar(255)
-  expiresAt DateTime @map("expires_at")
+  expiresAt DateTime @db.Timestamptz(3) @map("expires_at")
   revoked   Boolean  @default(false)
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @db.Timestamptz(3) @map("created_at")
   user      User     @relation(fields: [userId], references: [id])
 
   @@map("session_tokens")
@@ -47,8 +47,8 @@ model BusinessConfig {
   defaultInterestRate Decimal?    @map("default_interest_rate") @db.Decimal(5, 2)
   defaultPeriodType   PeriodType? @map("default_period_type")
   graceDays           Int         @default(0) @map("grace_days")
-  createdAt           DateTime    @default(now()) @map("created_at")
-  updatedAt           DateTime    @updatedAt @map("updated_at")
+  createdAt           DateTime    @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt           DateTime    @updatedAt @db.Timestamptz(3) @map("updated_at")
   user                User        @relation(fields: [userId], references: [id])
 
   @@map("business_config")
@@ -66,9 +66,9 @@ model Client {
   longitude  Decimal?     @db.Decimal(11, 8)
   status     ClientStatus @default(NO_LOAN)
   notes      String?
-  deletedAt  DateTime?    @map("deleted_at")
-  createdAt  DateTime     @default(now()) @map("created_at")
-  updatedAt  DateTime     @updatedAt @map("updated_at")
+  deletedAt  DateTime?    @db.Timestamptz(3) @map("deleted_at")
+  createdAt  DateTime     @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt  DateTime     @updatedAt @db.Timestamptz(3) @map("updated_at")
   user       User         @relation(fields: [userId], references: [id])
   guarantees Guarantee[]
   loans      Loan[]
@@ -87,9 +87,9 @@ model Guarantee {
   description    String
   estimatedValue Decimal?         @map("estimated_value") @db.Decimal(12, 2)
   status         GuaranteeStatus  @default(AVAILABLE)
-  deletedAt      DateTime?        @map("deleted_at")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
+  deletedAt      DateTime?        @db.Timestamptz(3) @map("deleted_at")
+  createdAt      DateTime         @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt      DateTime         @updatedAt @db.Timestamptz(3) @map("updated_at")
   photos         GuaranteePhoto[]
   client         Client           @relation(fields: [clientId], references: [id])
   loanLinks      LoanGuarantee[]
@@ -103,7 +103,7 @@ model GuaranteePhoto {
   id          String    @id @default(uuid())
   guaranteeId String    @map("guarantee_id")
   fileUrl     String    @map("file_url") @db.VarChar(500)
-  createdAt   DateTime  @default(now()) @map("created_at")
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3) @map("created_at")
   guarantee   Guarantee @relation(fields: [guaranteeId], references: [id])
 
   @@map("guarantee_photos")
@@ -126,8 +126,8 @@ model Loan {
   startDate          DateTime        @map("start_date") @db.Date
   firstDueDate       DateTime        @map("first_due_date") @db.Date
   notes              String?
-  createdAt          DateTime        @default(now()) @map("created_at")
-  updatedAt          DateTime        @updatedAt @map("updated_at")
+  createdAt          DateTime        @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt          DateTime        @updatedAt @db.Timestamptz(3) @map("updated_at")
   installments       Installment[]
   guarantees         LoanGuarantee[]
   refinances         LoanRefinance[]
@@ -146,8 +146,8 @@ model LoanGuarantee {
   loanId      String              @map("loan_id")
   guaranteeId String              @map("guarantee_id")
   status      GuaranteeLinkStatus @default(ACTIVE)
-  createdAt   DateTime            @default(now()) @map("created_at")
-  releasedAt  DateTime?           @map("released_at")
+  createdAt   DateTime            @default(now()) @db.Timestamptz(3) @map("created_at")
+  releasedAt  DateTime?           @db.Timestamptz(3) @map("released_at")
   guarantee   Guarantee           @relation(fields: [guaranteeId], references: [id])
   loan        Loan                @relation(fields: [loanId], references: [id])
 
@@ -167,10 +167,10 @@ model Installment {
   paidAmount        Decimal              @default(0) @map("paid_amount") @db.Decimal(12, 2)
   status            InstallmentStatus    @default(PENDING)
   daysOverdue       Int                  @default(0) @map("days_overdue")
-  paidAt            DateTime?            @map("paid_at")
+  paidAt            DateTime?            @db.Timestamptz(3) @map("paid_at")
   archived          Boolean              @default(false)
-  createdAt         DateTime             @default(now()) @map("created_at")
-  updatedAt         DateTime             @updatedAt @map("updated_at")
+  createdAt         DateTime             @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt         DateTime             @updatedAt @db.Timestamptz(3) @map("updated_at")
   loan              Loan                 @relation(fields: [loanId], references: [id])
   paymentLinks      PaymentInstallment[]
 
@@ -190,9 +190,9 @@ model Payment {
   method           PaymentMethod        @default(cash)
   notes            String?
   voided           Boolean              @default(false)
-  voidedAt         DateTime?            @map("voided_at")
+  voidedAt         DateTime?            @db.Timestamptz(3) @map("voided_at")
   voidReason       String?              @map("void_reason")
-  createdAt        DateTime             @default(now()) @map("created_at")
+  createdAt        DateTime             @default(now()) @db.Timestamptz(3) @map("created_at")
   installmentLinks PaymentInstallment[]
   loan             Loan                 @relation(fields: [loanId], references: [id])
   registrar        User                 @relation(fields: [registeredBy], references: [id])
@@ -229,7 +229,7 @@ model LoanRefinance {
   newInstallments      Int           @map("new_installments")
   newTotalAmount       Decimal       @map("new_total_amount") @db.Decimal(12, 2)
   notes                String?
-  createdAt            DateTime      @default(now()) @map("created_at")
+  createdAt            DateTime      @default(now()) @db.Timestamptz(3) @map("created_at")
   loan                 Loan          @relation(fields: [loanId], references: [id])
 
   @@index([loanId])

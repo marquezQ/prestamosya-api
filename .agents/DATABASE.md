@@ -28,6 +28,8 @@ Convenciones: columnas en `snake_case` en BD (gestionado con `@map` en Prisma), 
 
 ## Esquema completo (Prisma)
 
+> **Nota sobre timestamps:** El bloque de schema siguiente es histórico/resumido. Para el detalle actual de tipos de columna (todas las marcas temporales son `@db.Timestamptz(3)` y las de solo fecha `@db.Date`) y la política de zona horaria, ver la sección [Zonas horarias y timestamps](#zonas-horarias-y-timestamps). La fuente de verdad es `prisma/schema.prisma`.
+
 ```prisma
 generator client {
   provider     = "prisma-client"
@@ -369,6 +371,24 @@ model LoanRefinance {
 |-----------|-------------|
 | `20260615150807_init` | Esquema inicial del MVP |
 | `20260818012602_add_fortnightly_period` | Agrega `fortnightly` (quincenal) al enum `PeriodType`. Aplicada en dev y se aplicará automáticamente en prod vía `prisma migrate deploy` en el CI/CD |
+| `20260827181308_timestamps_timestamptz` | Convierte todas las columnas de marca temporal (`created_at`, `updated_at`, `deleted_at`, `expires_at`, `paid_at`, `voided_at`, `released_at`) de `TIMESTAMP` a `TIMESTAMPTZ`. Las columnas de solo fecha (`start_date`, `first_due_date`, `due_date`, `payment_date`) se mantienen como `DATE`. Ver sección "Zonas horarias y timestamps" más abajo |
+
+---
+
+## Zonas horarias y timestamps
+
+La aplicación **siempre opera en hora boliviana (`America/La_Paz`, UTC-4)**, tanto en el backend como en la base de datos, independientemente de la zona del VPS donde corra PostgreSQL.
+
+Cómo se garantiza:
+
+- **`src/main.ts`**: fija `process.env.TZ = 'America/La_Paz'` en el proceso Node. Así todos los `Date` que el backend genera (`new Date()`) y que Prisma envía a la BD (pagos, anulaciones, `paidAt`, `voidedAt`, etc.) se escriben en hora boliviana.
+- **`src/prisma/prisma.service.ts`**: el `Pool` de `pg` se crea con `options: '-c timezone=America/La_Paz'`, que PostgreSQL aplica al establecer la conexión (sin condición de carrera). Así los timestamps evaluados del lado de PostgreSQL (`DEFAULT CURRENT_TIMESTAMP`, `now()`) se generan en hora boliviana sin depender del `postgresql.conf` del host.
+- **Columnas de marca temporal** son `TIMESTAMPTZ(3)` (`@db.Timestamptz(3)` en Prisma): PostgreSQL almacena el instante absoluto (UTC interno) y lo interpreta según la zona de la sesión, eliminando ambigüedades.
+- **Columnas de solo fecha** (`@db.Date`): `Loan.startDate`, `Loan.firstDueDate`, `Installment.dueDate`, `Payment.paymentDate` — representan un día de negocio y se mantienen como `DATE`.
+
+**Respuestas de la API:** los timestamps se serializan a ISO 8601 con `Z` (UTC) vía `Date.toISOString()`. Es el mismo instante absoluto; el frontend es responsable de convertirlo a su zona para mostrar (o `America/La_Paz`).
+
+**Verificación rápida en prod:** ante la BD, `SELECT now()` debe mostrar la hora boliviana actual, y `SHOW timezone` debe devolver `America/La_Paz`.
 
 ### Configuración
 En **Prisma 7**, las migraciones y la ejecución de seeds se centralizan en `prisma.config.ts` (en lugar de `package.json`):
