@@ -377,18 +377,41 @@ model LoanRefinance {
 
 ## Zonas horarias y timestamps
 
-La aplicación **siempre opera en hora boliviana (`America/La_Paz`, UTC-4)**, tanto en el backend como en la base de datos, independientemente de la zona del VPS donde corra PostgreSQL.
+La aplicación **almacena y transmite todo en UTC**, y reserva `America/La_Paz` (UTC-4) para la **presentación** (mostrar fechas al usuario en el frontend y cálculos de "hoy" en la capa de aplicación). PostgreSQL guarda el instante absoluto; las marcas temporales son `TIMESTAMPTZ` (UTC interno).
 
-Cómo se garantiza:
+Cómo se implementa:
 
-- **`src/main.ts`**: fija `process.env.TZ = 'America/La_Paz'` en el proceso Node. Así todos los `Date` que el backend genera (`new Date()`) y que Prisma envía a la BD (pagos, anulaciones, `paidAt`, `voidedAt`, etc.) se escriben en hora boliviana.
-- **`src/prisma/prisma.service.ts`**: el `Pool` de `pg` se crea con `options: '-c timezone=America/La_Paz'`, que PostgreSQL aplica al establecer la conexión (sin condición de carrera). Así los timestamps evaluados del lado de PostgreSQL (`DEFAULT CURRENT_TIMESTAMP`, `now()`) se generan en hora boliviana sin depender del `postgresql.conf` del host.
-- **Columnas de marca temporal** son `TIMESTAMPTZ(3)` (`@db.Timestamptz(3)` en Prisma): PostgreSQL almacena el instante absoluto (UTC interno) y lo interpreta según la zona de la sesión, eliminando ambigüedades.
+- **Almacenamiento/sesión en UTC**: `src/prisma/prisma.service.ts` crea el `Pool` de `pg` **sin forzar zona horaria** (la sesión queda en UTC, el default de PostgreSQL). No se usa `options: '-c timezone=...'`: `@prisma/adapter-pg` serializa los `Date` en UTC sin sufijo de zona y normaliza la lectura a `+00:00`; forzar `America/La_Paz` desfasaría +4h/-4h todos los campos `timestamptz`. La DB almacena así el instante absoluto correcto.
+- **`src/main.ts`**: fija `process.env.TZ = 'America/La_Paz'` para que los cálculos de "día actual" en la capa de aplicación (`getTodayLaPaz()`, cron de mora, etc.) usen el día de negocio boliviano.
+- **Columnas de marca temporal** son `TIMESTAMPTZ(3)` (`@db.Timestamptz(3)` en Prisma): PostgreSQL almacena el instante absoluto (UTC interno).
 - **Columnas de solo fecha** (`@db.Date`): `Loan.startDate`, `Loan.firstDueDate`, `Installment.dueDate`, `Payment.paymentDate` — representan un día de negocio y se mantienen como `DATE`.
 
 **Respuestas de la API:** los timestamps se serializan a ISO 8601 con `Z` (UTC) vía `Date.toISOString()`. Es el mismo instante absoluto; el frontend es responsable de convertirlo a su zona para mostrar (o `America/La_Paz`).
 
-**Verificación rápida en prod:** ante la BD, `SELECT now()` debe mostrar la hora boliviana actual, y `SHOW timezone` debe devolver `America/La_Paz`.
+**Verificación rápida en prod:** `SHOW timezone` debe devolver `UTC` (por defecto). Si algún panel cliente fuerza otra zona en la sesión, consultar `SELECT now()` y confirmar que los `timestamptz` leídos se normalizan a `+00:00`.
+
+## Fechas, no horas
+
+La regla es **trabajar con fechas, no con horas**. Esto se aplica a todo el dominio de préstamos para evitar la complejidad y los errores de zona horaria:
+
+- **Cronogramas por fecha:** los cronogramas de cuotas se generan **por fecha** (`Installment.dueDate`, columna `DATE`), nunca por hora. Un préstamo se crea "por fecha" y cada cuota vence en un día calendario concreto.
+- **Los pagos se registran por fecha:** al registrar un pago, el frontend/mobile envía el **`paymentDate`** (`YYYY-MM-DD`, columna `DATE`). El sistema no deduce "cuándo" pagó a partir de la hora de procesamiento.
+
+## Fuente de verdad de los pagos
+
+Para **payments realizados**, la **única fuente de verdad es la fecha de pago (`Payment.paymentDate`)** que envía el frontend/mobile.
+
+- El `paymentDate` enviado por el cliente define en qué día queda contabilizado el pago (por ejemplo, al registrar un pago a una cuota vencida se envía la fecha efectiva de pago, no la fecha del procesamiento).
+- La segmentación "pagados hoy" del dashboard se basa en **`Payment.paymentDate`**, no en la marca de procesamiento (`Installment.paidAt` / `created_at`) ni en la hora.
+- `Installment.paidAt` es un metadato de auditoría (cuándo procesó el backend), **no** es la fuente de verdad de la fecha de pago.
+
+## UTC absoluto en la base de datos
+
+Toda la base de datos almacena **instantes absolutos en UTC**:
+
+- Las columnas de marca temporal (`@db.Timestamptz(3)`: `created_at`, `updated_at`, `paid_at`, `voided_at`, etc.) guardan el instante absoluto en UTC, sin depender de la zona del VPS ni de la sesión.
+- Las columnas de **solo fecha** (`@db.Date`: `payment_date`, `due_date`, `start_date`, `first_due_date`) representan un día calendario sin zona.
+- La conversión a `America/La_Paz` ocurre **solo** en la capa de presentación (frontend/mobile).
 
 ### Configuración
 En **Prisma 7**, las migraciones y la ejecución de seeds se centralizan en `prisma.config.ts` (en lugar de `package.json`):

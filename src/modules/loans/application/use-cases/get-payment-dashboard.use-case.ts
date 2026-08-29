@@ -50,6 +50,15 @@ interface RawInstallmentWithLoanAndClient {
   };
 }
 
+interface RawPaymentWithInstallments {
+  id: string;
+  paymentDate: Date;
+  voided: boolean;
+  installmentLinks: Array<{
+    installment: RawInstallmentWithLoanAndClient;
+  }>;
+}
+
 /**
  * Caso de uso de lectura: Dashboard dinámico de pagos del cobrador/administrador.
  *
@@ -136,45 +145,97 @@ export class GetPaymentDashboardUseCase {
       orderBy: { dueDate: 'asc' },
     });
 
-    // 3. Cuotas pagadas en la fecha seleccionada (paidAt >= inicio de targetDate y < targetTomorrow)
-    const paidTodayRaw = await this.prisma.installment.findMany({
+    // 3. Cuotas pagadas en la fecha seleccionada. La fuente de verdad es la fecha
+    //    de pago registrada (Payment.paymentDate, enviada por el frontend), NO la
+    //    marca de tiempo de procesamiento (Installment.paidAt / created_at).
+    //    Se consultan los pagos de ese día y se derivan las cuotas que recibieron
+    //    al menos un pago en esa fecha (deduplicadas por cuota).
+    const paidTodayRaw = await this.prisma.payment.findMany({
       where: {
         loan: {
           client: { userId, deletedAt: null },
         },
-        archived: false,
-        status: 'PAID',
-        paidAt: {
+        voided: false,
+        paymentDate: {
           gte: targetDate,
           lt: targetTomorrow,
         },
       },
       include: {
-        loan: {
+        installmentLinks: {
           include: {
-            client: {
-              select: { id: true, fullName: true, phone: true },
+            installment: {
+              include: {
+                loan: {
+                  include: {
+                    client: {
+                      select: { id: true, fullName: true, phone: true },
+                    },
+                  },
+                },
+              },
             },
           },
         },
       },
-      orderBy: { paidAt: 'desc' },
+      orderBy: { paymentDate: 'desc' },
     });
+
+    const paidToday = this.flattenPaidToday(paidTodayRaw).map((item) =>
+      this.mapToItem(item.installment, item.paymentDate, serverToday),
+    );
 
     return {
       metadata: {
         targetDate: targetDateFormattedStr,
         serverToday: serverTodayStr,
       },
-      dueToday: dueTodayRaw.map((item) => this.mapToItem(item, serverToday)),
-      overdue: overdueRaw.map((item) => this.mapToItem(item, serverToday)),
-      paidToday: paidTodayRaw.map((item) => this.mapToItem(item, serverToday)),
+      dueToday: dueTodayRaw.map((item) =>
+        this.mapToItem(item, undefined, serverToday),
+      ),
+      overdue: overdueRaw.map((item) =>
+        this.mapToItem(item, undefined, serverToday),
+      ),
+      paidToday,
     };
+  }
+
+  /**
+   * Aplana las cuotas pagadas a partir de los pagos del día, deduplicándolas por
+   * cuota. Devuelve además la fecha de pago asociada (Payment.paymentDate) que
+   * se usará como `paidAt` en la respuesta.
+   */
+  private flattenPaidToday(payments: RawPaymentWithInstallments[]): Array<{
+    installment: RawInstallmentWithLoanAndClient;
+    paymentDate: Date;
+  }> {
+    const seen = new Map<string, RawInstallmentWithLoanAndClient>();
+    const paymentDates = new Map<string, Date>();
+
+    for (const payment of payments) {
+      for (const link of payment.installmentLinks) {
+        const inst = link.installment;
+        seen.set(inst.id, inst);
+        // Se conserva la fecha del pago más reciente que afectó a la cuota.
+        if (
+          !paymentDates.has(inst.id) ||
+          payment.paymentDate.getTime() > paymentDates.get(inst.id)!.getTime()
+        ) {
+          paymentDates.set(inst.id, payment.paymentDate);
+        }
+      }
+    }
+
+    return Array.from(seen.entries()).map(([id, installment]) => ({
+      installment,
+      paymentDate: paymentDates.get(id)!,
+    }));
   }
 
   private mapToItem(
     raw: RawInstallmentWithLoanAndClient,
-    today: Date,
+    paidAt?: Date,
+    today: Date = new Date(),
   ): DashboardInstallmentItem {
     const dueDate = getStartOfDay(new Date(raw.dueDate));
     const diffTime = today.getTime() - dueDate.getTime();
@@ -199,7 +260,11 @@ export class GetPaymentDashboardUseCase {
       remainingAmount: totalAmount - paidAmount,
       status: raw.status,
       daysOverdue,
-      paidAt: raw.paidAt ? raw.paidAt.toISOString() : null,
+      paidAt: paidAt
+        ? paidAt.toISOString()
+        : raw.paidAt
+          ? raw.paidAt.toISOString()
+          : null,
     };
   }
 }
