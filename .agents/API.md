@@ -75,7 +75,9 @@ DELETE /api/loans/:id/guarantees/:guaranteeId → 200 OK (desvincular)
 POST   /api/loans/:id/refinance               → LoanRefinance + nuevas Installment[]
 ```
 
-> **Bodies de create/simulate:** el campo `firstDueDate` NO se envía. El body usa `startDate` (fecha de desembolso, YYYY-MM-DD) y el backend calcula la primera cuota como `startDate + 1 período`. `periodType` válido: `daily`, `weekly`, `fortnightly`, `monthly`, `custom`.
+> **Bodies de create/simulate:**
+> - El campo `firstDueDate` NO se envía. El body usa `startDate` (fecha de desembolso, YYYY-MM-DD) y el backend calcula la primera cuota como `startDate + 1 período`. `periodType` válido: `daily`, `weekly`, `fortnightly`, `monthly`, `custom`.
+> - **Tipo de Cronograma (`scheduleType`)**: Opcional. Acepta `'EQUAL_INSTALLMENTS'` (por defecto: cuotas iguales con capital + interés) o `'INTEREST_ONLY'` (modelo Balloon: solo interés por cuota, capital completo en la última).
 
 ---
 

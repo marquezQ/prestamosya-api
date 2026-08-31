@@ -140,6 +140,102 @@ export class LoanCalculatorService {
   }
 
   /**
+   * Calcula las cuotas para un préstamo en modo automático con cronograma
+   * "Interés puro + Capital al final" (Balloon / Interest-Only).
+   *
+   * Fórmula:
+   *   - Cuotas 1 a N-1: solo interés por período
+   *       capitalAmount   = 0
+   *       interestAmount  = capital × (tasa / 100)
+   *       totalAmount     = interestAmount
+   *
+   *   - Última cuota (N): interés + capital completo
+   *       capitalAmount   = capital prestado
+   *       interestAmount  = capital × (tasa / 100)
+   *       totalAmount     = capital + interestAmount
+   *
+   * El totalAmount del préstamo es idéntico al modo EQUAL_INSTALLMENTS:
+   *   totalAmount = capital + (interés_por_período × n_cuotas)
+   *
+   * Muy utilizado en el mercado boliviano (préstamos informales donde
+   * el cliente paga "solo interés" cada mes y devuelve el capital al final).
+   */
+  calculateInterestOnlyInstallments(
+    params: CalculateInstallmentsParams,
+  ): CalculateInstallmentsResult {
+    const { capital, interestRate, totalInstallments, startDate, periodType } =
+      params;
+
+    const firstDueDate = this.calculateDueDate(startDate, periodType, 1);
+    const currency = capital.currency;
+
+    // Interés por período = capital × tasa
+    const ratePerPeriod = interestRate.dividedBy(100);
+    const interestPerPeriodRaw = capital.amount
+      .mul(ratePerPeriod)
+      .toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+
+    const interestPerPeriod = Money.of(interestPerPeriodRaw, currency);
+
+    // Total del préstamo = capital + (interés × n_cuotas)
+    const totalInterestRaw = interestPerPeriodRaw.mul(totalInstallments);
+    const totalAmount = capital.add(Money.of(totalInterestRaw, currency));
+
+    const installments: InstallmentEntity[] = [];
+
+    for (let i = 1; i <= totalInstallments; i++) {
+      const dueDate = this.calculateDueDate(firstDueDate, periodType, i - 1);
+      const isLast = i === totalInstallments;
+
+      if (isLast) {
+        // Última cuota: interés + capital completo
+        // El interés de la última cuota absorbe cualquier diferencia de redondeo acumulada
+        const accumulatedInterest = interestPerPeriodRaw.mul(
+          totalInstallments - 1,
+        );
+        const lastInterestRaw = totalInterestRaw.minus(accumulatedInterest);
+
+        installments.push(
+          new InstallmentEntity(
+            null,
+            null,
+            i,
+            dueDate,
+            capital, // capitalAmount completo
+            Money.of(lastInterestRaw, currency),
+            capital.add(Money.of(lastInterestRaw, currency)),
+            Money.zero(currency),
+            InstallmentStatus.PENDING,
+            0,
+            null,
+            false,
+          ),
+        );
+      } else {
+        // Cuotas intermedias: solo interés, capital = 0
+        installments.push(
+          new InstallmentEntity(
+            null,
+            null,
+            i,
+            dueDate,
+            Money.zero(currency), // capitalAmount = 0
+            interestPerPeriod,
+            interestPerPeriod, // totalAmount = solo interés
+            Money.zero(currency),
+            InstallmentStatus.PENDING,
+            0,
+            null,
+            false,
+          ),
+        );
+      }
+    }
+
+    return { installments, totalAmount };
+  }
+
+  /**
    * Calcula la fecha de vencimiento para una cuota según el tipo de período.
    * Utiliza métodos UTC para evitar desfases por zona horaria.
    */

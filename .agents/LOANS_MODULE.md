@@ -99,8 +99,19 @@ Las siguientes fases deben desarrollarse para dar por concluido completamente el
 - **`CronController` (`POST /api/admin/recalculate-overdue`)**: Endpoint de respaldo administrativo para forzar la actualización síncrona en cualquier momento.
 - **Zona Horaria Global**: Proceso Node configurado con `process.env.TZ = 'America/La_Paz'` en `main.ts` y utilidades de fecha en `src/common/utils/date.utils.ts`.
 
-### Testing de esta etapa
-- Se implementaron **118 tests unitarios aislados** (`14 test suites` en verde) verificando recálculo diario, idempotencia, estados de cliente y flujo de mora.
+### Fase 8b: Liquidación Anticipada con Condonación de Interés (`SettleLoanUseCase`)
+- **`POST /api/payments/settle`**: Cierra un préstamo antes de su vencimiento aceptando dinero físico real (`amount`) e interés condonado (`discount`).
+- **Invariante Crítico**: `LoanEntity.totalAmount` es `readonly` e inmutable. El contrato original no cambia, permitiendo mantener estadísticas exactas. `discount` se guarda en `payment.discountAmount`.
+- **Regla Dominio**: `amount + discount` debe ser **exactamente igual** al `outstandingBalance`. El préstamo pasa a `COMPLETED`.
+
+### Fase 7c: Modalidad de Cronograma `LoanScheduleType` (`INTEREST_ONLY`)
+- **`LoanScheduleType`**: Enum en dominio y BD (`EQUAL_INSTALLMENTS` | `INTEREST_ONLY`).
+- **`EQUAL_INSTALLMENTS` (Default)**: Amortización estándar con capital + interés distribuido en cada cuota.
+- **`INTEREST_ONLY` (Nuevo - Modelo Balloon)**: Cuotas 1 a N-1 cobran únicamente el interés generado en cada período (`capitalAmount = 0`); la última cuota (N) cobra el interés del período más el **capital completo** prestado (`capitalAmount = capital`).
+- **Simulación y Creación**: Soporte completo en `POST /api/loans/simulate` y `POST /api/loans` pasando `scheduleType: 'INTEREST_ONLY'`. Es opcional; si se omite, asume `EQUAL_INSTALLMENTS` para retrocompatibilidad total.
+
+### Testing del Módulo
+- Se cuenta con **125 tests unitarios aislados** (`15 test suites` en verde) verificando recálculo diario, idempotencia, estados de cliente, flujo de mora, liquidación anticipada y cálculo de cronogramas `INTEREST_ONLY`.
 
 ---
 

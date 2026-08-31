@@ -4,7 +4,12 @@ import {
   Installment as PrismaInstallment,
 } from '../../../../generated/prisma/client';
 import { LoanEntity } from '../../domain/entities/loan.entity';
-import { LoanMode, LoanStatus, PeriodType } from '../../domain/enums';
+import {
+  LoanMode,
+  LoanScheduleType,
+  LoanStatus,
+  PeriodType,
+} from '../../domain/enums';
 import { Money } from '../../domain/value-objects/money.vo';
 import { InstallmentMapper } from './installment.mapper';
 
@@ -44,6 +49,8 @@ export class LoanMapper {
       raw.firstDueDate,
       raw.notes,
       installments,
+      (raw.scheduleType as LoanScheduleType) ??
+        LoanScheduleType.EQUAL_INSTALLMENTS,
     );
   }
 
@@ -55,6 +62,7 @@ export class LoanMapper {
       clientId: entity.clientId,
       createdBy: entity.createdBy,
       mode: entity.mode,
+      scheduleType: entity.scheduleType,
       capitalAmount: entity.capitalAmount.toString(),
       currency: entity.currency,
       interestRate: entity.interestRate.toString(),
@@ -80,6 +88,7 @@ export class LoanMapper {
       clientId: entity.clientId,
       createdBy: entity.createdBy,
       mode: entity.mode,
+      scheduleType: entity.scheduleType,
       capitalAmount: entity.capitalAmount.toString(),
       currency: entity.currency,
       interestRate: entity.interestRate.toNumber(),

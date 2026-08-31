@@ -1,5 +1,5 @@
 import Decimal from 'decimal.js';
-import { LoanStatus, LoanMode, PeriodType } from '../enums';
+import { LoanStatus, LoanMode, PeriodType, LoanScheduleType } from '../enums';
 import {
   LoanNotActiveError,
   LoanNotRefinancableError,
@@ -40,6 +40,7 @@ export class LoanEntity {
     public readonly firstDueDate: Date,
     public readonly notes: string | null,
     public installments: InstallmentEntity[],
+    public readonly scheduleType: LoanScheduleType = LoanScheduleType.EQUAL_INSTALLMENTS,
   ) {}
 
   /** Moneda del préstamo, delegada al capitalAmount. */

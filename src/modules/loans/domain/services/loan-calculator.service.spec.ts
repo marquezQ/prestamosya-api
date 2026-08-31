@@ -182,6 +182,51 @@ describe('LoanCalculatorService', () => {
     });
   });
 
+  describe('calculateInterestOnlyInstallments()', () => {
+    it('should calculate interest-only installments (1000 BOB / 3 installments / 10% monthly -> 100, 100, 1100)', () => {
+      const capital = Money.of(1000, 'BOB');
+      const interestRate = new Decimal(10);
+
+      const result = calculator.calculateInterestOnlyInstallments({
+        capital,
+        interestRate,
+        totalInstallments: 3,
+        startDate: new Date('2026-08-01T00:00:00.000Z'),
+        periodType: PeriodType.MONTHLY,
+      });
+
+      expect(result.totalAmount.toNumber()).toBe(1300);
+      expect(result.installments).toHaveLength(3);
+
+      // Cuota 1: capital=0, interés=100, total=100
+      expect(result.installments[0].totalAmount.toNumber()).toBe(100.0);
+      expect(result.installments[0].capitalAmount.toNumber()).toBe(0.0);
+      expect(result.installments[0].interestAmount.toNumber()).toBe(100.0);
+
+      // Cuota 2: capital=0, interés=100, total=100
+      expect(result.installments[1].totalAmount.toNumber()).toBe(100.0);
+      expect(result.installments[1].capitalAmount.toNumber()).toBe(0.0);
+      expect(result.installments[1].interestAmount.toNumber()).toBe(100.0);
+
+      // Cuota 3 (última): capital=1000, interés=100, total=1100
+      expect(result.installments[2].totalAmount.toNumber()).toBe(1100.0);
+      expect(result.installments[2].capitalAmount.toNumber()).toBe(1000.0);
+      expect(result.installments[2].interestAmount.toNumber()).toBe(100.0);
+
+      const sumTotal = result.installments.reduce(
+        (acc, inst) => acc.add(inst.totalAmount),
+        Money.zero('BOB'),
+      );
+      expect(sumTotal.toNumber()).toBe(1300);
+
+      const sumCapital = result.installments.reduce(
+        (acc, inst) => acc.add(inst.capitalAmount),
+        Money.zero('BOB'),
+      );
+      expect(sumCapital.toNumber()).toBe(1000);
+    });
+  });
+
   describe('calculateDueDate()', () => {
     const baseDate = new Date('2026-09-01T00:00:00.000Z');
 

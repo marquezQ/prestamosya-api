@@ -114,6 +114,7 @@ model Loan {
   clientId           String          @map("client_id")
   createdBy          String          @map("created_by")
   mode               LoanMode
+  scheduleType       LoanScheduleType @default(EQUAL_INSTALLMENTS) @map("schedule_type")
   capitalAmount      Decimal         @map("capital_amount") @db.Decimal(12, 2)
   currency           Currency        @default(BOB)
   interestRate       Decimal         @default(0) @map("interest_rate") @db.Decimal(5, 2)
@@ -258,6 +259,11 @@ enum PeriodType {
 enum LoanMode {
   automatic
   manual
+}
+
+enum LoanScheduleType {
+  EQUAL_INSTALLMENTS
+  INTEREST_ONLY
 }
 
 enum LoanStatus {

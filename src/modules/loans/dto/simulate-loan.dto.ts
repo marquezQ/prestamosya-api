@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsDateString,
   IsEnum,
@@ -6,11 +6,12 @@ import {
   IsInt,
   IsNotEmpty,
   IsNumber,
+  IsOptional,
   IsString,
   Max,
   Min,
 } from 'class-validator';
-import { PeriodType } from '../domain/enums';
+import { LoanScheduleType, PeriodType } from '../domain/enums';
 import { Currency } from '../domain/value-objects/money.vo';
 
 export class SimulateLoanDto {
@@ -45,6 +46,16 @@ export class SimulateLoanDto {
   @ApiProperty({ enum: PeriodType, default: PeriodType.MONTHLY })
   @IsEnum(PeriodType)
   periodType: PeriodType;
+
+  @ApiPropertyOptional({
+    enum: LoanScheduleType,
+    default: LoanScheduleType.EQUAL_INSTALLMENTS,
+    description:
+      'Tipo de cronograma: EQUAL_INSTALLMENTS (cuotas iguales) o INTEREST_ONLY (solo interés, capital al final)',
+  })
+  @IsOptional()
+  @IsEnum(LoanScheduleType)
+  scheduleType?: LoanScheduleType;
 
   @ApiProperty({
     default: 3,

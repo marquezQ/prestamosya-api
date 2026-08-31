@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import Decimal from 'decimal.js';
+import { LoanScheduleType } from '../../domain/enums';
 import { LoanCalculatorService } from '../../domain/services/loan-calculator.service';
 import { Money } from '../../domain/value-objects/money.vo';
 import { SimulateLoanDto } from '../../dto/simulate-loan.dto';
@@ -20,13 +21,18 @@ export class SimulateLoanUseCase {
     const interestRate = new Decimal(dto.interestRate);
     const startDate = new Date(dto.startDate);
 
-    const result = this.calculator.calculateInstallments({
+    const calcParams = {
       capital,
       interestRate,
       totalInstallments: dto.totalInstallments,
       startDate,
       periodType: dto.periodType,
-    });
+    };
+
+    const result =
+      dto.scheduleType === LoanScheduleType.INTEREST_ONLY
+        ? this.calculator.calculateInterestOnlyInstallments(calcParams)
+        : this.calculator.calculateInstallments(calcParams);
 
     return {
       installments: result.installments,

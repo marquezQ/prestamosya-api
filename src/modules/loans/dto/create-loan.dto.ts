@@ -15,7 +15,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { LoanMode, PeriodType } from '../domain/enums';
+import { LoanMode, LoanScheduleType, PeriodType } from '../domain/enums';
 import { Currency } from '../domain/value-objects/money.vo';
 
 export class ManualInstallmentDto {
@@ -92,6 +92,16 @@ export class CreateLoanDto {
   @IsOptional()
   @IsEnum(PeriodType)
   periodType?: PeriodType;
+
+  @ApiPropertyOptional({
+    enum: LoanScheduleType,
+    default: LoanScheduleType.EQUAL_INSTALLMENTS,
+    description:
+      'Tipo de cronograma para modo automático: EQUAL_INSTALLMENTS (capital+interés cuota a cuota) o INTEREST_ONLY (solo interés cuota a cuota, capital en la última cuota)',
+  })
+  @IsOptional()
+  @IsEnum(LoanScheduleType)
+  scheduleType?: LoanScheduleType;
 
   @ApiProperty({
     default: 3,

@@ -10,6 +10,7 @@ import { LoanEntity } from '../../domain/entities/loan.entity';
 import {
   InstallmentStatus,
   LoanMode,
+  LoanScheduleType,
   LoanStatus,
   PeriodType,
 } from '../../domain/enums';
@@ -52,13 +53,18 @@ export class CreateLoanUseCase {
         );
       }
 
-      const result = this.calculator.calculateInstallments({
+      const calcParams = {
         capital,
         interestRate,
         totalInstallments: dto.totalInstallments,
         startDate,
         periodType: dto.periodType,
-      });
+      };
+
+      const result =
+        dto.scheduleType === LoanScheduleType.INTEREST_ONLY
+          ? this.calculator.calculateInterestOnlyInstallments(calcParams)
+          : this.calculator.calculateInstallments(calcParams);
 
       installments = result.installments;
       totalAmount = result.totalAmount;
@@ -128,6 +134,7 @@ export class CreateLoanUseCase {
       firstDueDate,
       dto.notes ?? null,
       installments,
+      dto.scheduleType ?? LoanScheduleType.EQUAL_INSTALLMENTS,
     );
 
     // 3. Persistir atómicamente con UnitOfWork
