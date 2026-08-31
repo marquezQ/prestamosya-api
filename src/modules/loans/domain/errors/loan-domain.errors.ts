@@ -63,3 +63,21 @@ export class PaymentAlreadyVoidedError extends LoanDomainError {
     this.name = 'PaymentAlreadyVoidedError';
   }
 }
+
+export class SettlementExceedsBalanceError extends LoanDomainError {
+  constructor(totalSettlement: string, outstandingBalance: string) {
+    super(
+      `Settlement total (amount + discount = ${totalSettlement}) exceeds outstanding balance (${outstandingBalance})`,
+    );
+    this.name = 'SettlementExceedsBalanceError';
+  }
+}
+
+export class SettlementDoesNotClearBalanceError extends LoanDomainError {
+  constructor(totalSettlement: string, outstandingBalance: string) {
+    super(
+      `Settlement total (amount + discount = ${totalSettlement}) must equal the outstanding balance (${outstandingBalance}) to fully settle the loan`,
+    );
+    this.name = 'SettlementDoesNotClearBalanceError';
+  }
+}

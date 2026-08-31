@@ -84,6 +84,7 @@ POST   /api/loans/:id/refinance               → LoanRefinance + nuevas Install
 ```
 GET    /api/payments/dashboard?date=2026-08-20  → { metadata: { targetDate, serverToday }, dueToday[], overdue[], paidToday[] }
 POST   /api/payments                            → RegisterPaymentResult (aplica pago FIFO)
+POST   /api/payments/settle                     → SettleLoanResult (liquidación anticipada con condonación de interés)
 DELETE /api/payments/:id                        → 200 OK (anular pago, requiere { reason } en body)
 ```
 
@@ -103,9 +104,28 @@ DELETE /api/payments/:id                        → 200 OK (anular pago, requier
 }
 ```
 
-> `method` acepta: `"cash"`, `"transfer"`, `"qr"`. `paymentDate` formato: `YYYY-MM-DD`.
+> `method` acepta: `"cash"`, `"transfer"`. `paymentDate` formato: `YYYY-MM-DD`.
 
-**2. Anular un pago (`DELETE /api/payments/:id`)**
+**2. Liquidar anticipadamente un préstamo (`POST /api/payments/settle`)**
+
+```json
+{
+  "loanId": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
+  "amount": 1100.00,
+  "discount": 100.00,
+  "method": "cash",
+  "paymentDate": "2026-10-20",
+  "notes": "Liquidación anticipada. Interés del mes 3 condonado."
+}
+```
+
+> **Regla crítica:** `amount + discount` debe igualar exactamente el `outstandingBalance` del préstamo.
+> - `amount` = dinero físico real que el cliente entrega.
+> - `discount` = interés futuro que el prestamista condona (puede ser `0` si liquida sin descuento).
+> - El préstamo siempre pasa a `COMPLETED`. `totalAmount` permanece intacto para estadísticas.
+> - `discount` se persiste en `payment.discountAmount` — **no** se suma a la ganancia del mes.
+
+**3. Anular un pago (`DELETE /api/payments/:id`)**
 
 ```json
 {
@@ -114,6 +134,7 @@ DELETE /api/payments/:id                        → 200 OK (anular pago, requier
 ```
 
 > **Nota Swagger / Postman:** Los DTOs tienen decoradores `@ApiProperty` con `default` configurados. Al acceder a `/api` (Swagger UI) o `/api-json` (para importar la colección a Postman), los cuerpos de solicitud se autocompletan con estos valores de ejemplo.
+
 
 ---
 

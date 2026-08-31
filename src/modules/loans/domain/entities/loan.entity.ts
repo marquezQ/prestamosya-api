@@ -4,6 +4,8 @@ import {
   LoanNotActiveError,
   LoanNotRefinancableError,
   PaymentExceedsBalanceError,
+  SettlementDoesNotClearBalanceError,
+  SettlementExceedsBalanceError,
 } from '../errors/loan-domain.errors';
 import { Currency, Money } from '../value-objects/money.vo';
 import { InstallmentEntity } from './installment.entity';
@@ -93,6 +95,51 @@ export class LoanEntity {
     if (this.outstandingBalance.isZero()) {
       this.status = LoanStatus.COMPLETED;
     }
+  }
+
+  /**
+   * Liquida anticipadamente el préstamo aplicando un pago real más un descuento
+   * de interés futuro condonado por el prestamista.
+   *
+   * INVARIANTE CRÍTICO: `totalAmount` NUNCA se modifica. Es el contrato
+   * original del préstamo y debe permanecer intacto para las estadísticas
+   * históricas (ganancia proyectada vs. ganancia real).
+   *
+   * El `discountAmount` se persiste en el registro `Payment` como columna
+   * separada, permitiendo que los reportes distingan:
+   *   - Ganancia real = totalPaid - capitalAmount
+   *   - Interés condonado = sum(payments.discountAmount)
+   *
+   * @param paymentAmount - Dinero físico entregado por el cliente
+   * @param discountAmount - Interés futuro condonado por el prestamista
+   * @throws LoanNotActiveError si el préstamo no está activo
+   * @throws SettlementExceedsBalanceError si amount + discount supera el saldo
+   * @throws SettlementDoesNotClearBalanceError si amount + discount no liquida el saldo completo
+   */
+  settleEarly(paymentAmount: Money, discountAmount: Money): void {
+    if (!this.canReceivePayment()) {
+      throw new LoanNotActiveError(this.id ?? 'new', this.status);
+    }
+
+    const totalSettlement = paymentAmount.add(discountAmount);
+
+    if (totalSettlement.isGreaterThan(this.outstandingBalance)) {
+      throw new SettlementExceedsBalanceError(
+        totalSettlement.toString(),
+        this.outstandingBalance.toString(),
+      );
+    }
+
+    if (!totalSettlement.equals(this.outstandingBalance)) {
+      throw new SettlementDoesNotClearBalanceError(
+        totalSettlement.toString(),
+        this.outstandingBalance.toString(),
+      );
+    }
+
+    this.outstandingBalance = this.outstandingBalance.subtract(totalSettlement);
+    this.totalPaid = this.totalPaid.add(paymentAmount); // Solo dinero físico real
+    this.status = LoanStatus.COMPLETED; // Garantizado: outstandingBalance == 0
   }
 
   /**

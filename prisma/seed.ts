@@ -60,7 +60,7 @@ async function main() {
         exchangeRate: 6.96,
         defaultInterestRate: 10.0,
         defaultPeriodType: 'daily',
-        graceDays: 2,
+        graceDays: 0,
       },
     });
   }

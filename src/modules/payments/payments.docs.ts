@@ -65,3 +65,32 @@ export function ApiVoidPaymentDoc() {
     }),
   );
 }
+
+export function ApiSettleLoanDoc() {
+  return applyDecorators(
+    ApiOperation({
+      summary:
+        'Liquidar anticipadamente un préstamo con condonación de interés',
+      description:
+        'Permite cerrar un préstamo antes de su vencimiento. ' +
+        'El campo `amount` corresponde al dinero físico entregado por el cliente; ' +
+        '`discount` es el interés futuro que el prestamista condona. ' +
+        'La suma `amount + discount` DEBE igualar exactamente el saldo pendiente (`outstandingBalance`) del préstamo. ' +
+        'El préstamo pasa a estado COMPLETED y `totalAmount` permanece intacto para estadísticas históricas. ' +
+        'El descuento queda registrado en `payment.discountAmount` para reportes de condonaciones.',
+    }),
+    ApiResponse({
+      status: 201,
+      description: 'Préstamo liquidado exitosamente',
+    }),
+    ApiResponse({
+      status: 400,
+      description:
+        'amount + discount no iguala el saldo pendiente, o el préstamo no está activo',
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Préstamo no encontrado o no pertenece al usuario',
+    }),
+  );
+}

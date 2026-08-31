@@ -15,14 +15,17 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { GetPaymentDashboardUseCase } from '../loans/application/use-cases/get-payment-dashboard.use-case';
 import { RegisterPaymentUseCase } from '../loans/application/use-cases/register-payment.use-case';
+import { SettleLoanUseCase } from '../loans/application/use-cases/settle-loan.use-case';
 import { VoidPaymentUseCase } from '../loans/application/use-cases/void-payment.use-case';
 import { LoanDomainError } from '../loans/domain/errors/loan-domain.errors';
 import { QueryPaymentDashboardDto } from './dto/query-payment-dashboard.dto';
 import { RegisterPaymentDto } from './dto/register-payment.dto';
+import { SettleLoanDto } from './dto/settle-loan.dto';
 import { VoidPaymentDto } from './dto/void-payment.dto';
 import {
   ApiGetPaymentDashboardDoc,
   ApiRegisterPaymentDoc,
+  ApiSettleLoanDoc,
   ApiVoidPaymentDoc,
 } from './payments.docs';
 
@@ -33,6 +36,7 @@ export class PaymentsController {
     private readonly registerPaymentUseCase: RegisterPaymentUseCase,
     private readonly voidPaymentUseCase: VoidPaymentUseCase,
     private readonly getPaymentDashboardUseCase: GetPaymentDashboardUseCase,
+    private readonly settleLoanUseCase: SettleLoanUseCase,
   ) {}
 
   @Get('dashboard')
@@ -59,6 +63,23 @@ export class PaymentsController {
       return {
         data,
         message: 'Payment registered successfully',
+      };
+    } catch (error) {
+      if (error instanceof LoanDomainError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  @Post('settle')
+  @ApiSettleLoanDoc()
+  async settle(@CurrentUser() user: JwtPayload, @Body() dto: SettleLoanDto) {
+    try {
+      const data = await this.settleLoanUseCase.execute(user.sub, dto);
+      return {
+        data,
+        message: 'Loan settled successfully',
       };
     } catch (error) {
       if (error instanceof LoanDomainError) {

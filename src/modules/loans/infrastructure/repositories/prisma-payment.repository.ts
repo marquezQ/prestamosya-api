@@ -29,6 +29,7 @@ export class PrismaPaymentRepository extends PaymentRepository {
         loanId: data.loanId,
         registeredBy: data.registeredBy,
         amount: data.amount,
+        discountAmount: data.discountAmount ?? '0.00',
         paymentDate: data.paymentDate,
         method: data.method,
         notes: data.notes,

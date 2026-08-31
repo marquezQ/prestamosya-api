@@ -14,6 +14,7 @@ import { GetLoanDetailUseCase } from './application/use-cases/get-loan-detail.us
 import { RegisterPaymentUseCase } from './application/use-cases/register-payment.use-case';
 import { VoidPaymentUseCase } from './application/use-cases/void-payment.use-case';
 import { GetPaymentDashboardUseCase } from './application/use-cases/get-payment-dashboard.use-case';
+import { SettleLoanUseCase } from './application/use-cases/settle-loan.use-case';
 import { PrismaLoanRepository } from './infrastructure/repositories/prisma-loan.repository';
 import { PrismaInstallmentRepository } from './infrastructure/repositories/prisma-installment.repository';
 import { PrismaPaymentRepository } from './infrastructure/repositories/prisma-payment.repository';
@@ -33,6 +34,7 @@ import { LoansController } from './infrastructure/loans.controller';
     RegisterPaymentUseCase,
     VoidPaymentUseCase,
     GetPaymentDashboardUseCase,
+    SettleLoanUseCase,
     // useFactory garantiza que PrismaService se inyecta explícitamente.
     // No podemos usar useClass porque el constructor recibe PrismaClientLike
     // (type alias), que TypeScript compila a `Object` en reflect-metadata
@@ -64,6 +66,7 @@ import { LoansController } from './infrastructure/loans.controller';
     RegisterPaymentUseCase,
     VoidPaymentUseCase,
     GetPaymentDashboardUseCase,
+    SettleLoanUseCase,
     UnitOfWork,
     LoanRepository,
     InstallmentRepository,

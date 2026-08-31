@@ -12,6 +12,7 @@ export interface CreatePaymentData {
   loanId: string;
   registeredBy: string; // userId del admin que registra el pago
   amount: string; // Decimal como string (ej: "500.00")
+  discountAmount?: string; // Interés condonado en liquidación anticipada (ej: "100.00"). Omitir en pagos normales.
   paymentDate: Date;
   method: 'cash' | 'transfer';
   notes: string | null;
