@@ -20,6 +20,7 @@ export interface DashboardInstallmentItem {
   status: string;
   daysOverdue: number;
   paidAt: string | null;
+  currency: string;
 }
 
 export interface PaymentDashboardResult {
@@ -42,6 +43,7 @@ interface RawInstallmentWithLoanAndClient {
   status: string;
   paidAt: Date | null;
   loan: {
+    currency: string;
     client: {
       id: string;
       fullName: string;
@@ -265,6 +267,7 @@ export class GetPaymentDashboardUseCase {
         : raw.paidAt
           ? raw.paidAt.toISOString()
           : null,
+      currency: raw.loan.currency,
     };
   }
 }
