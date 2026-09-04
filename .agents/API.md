@@ -90,7 +90,7 @@ POST   /api/payments/settle                     → SettleLoanResult (liquidaci�
 DELETE /api/payments/:id                        → 200 OK (anular pago, requiere { reason } en body)
 ```
 
-> **Dashboard Dinámico de Pagos:** El parámetro `?date=YYYY-MM-DD` es opcional. Permite navegar por la agenda/carrusel de fechas de la UI. Si se omite, asume la fecha actual del servidor (`serverToday`). devuelven metadatos con la fecha consultada (`targetDate`) y la fecha real del servidor (`serverToday`).
+> **Dashboard Dinámico de Pagos:** El parámetro `?date=YYYY-MM-DD` es opcional. Permite navegar por la agenda/carrusel de fechas de la UI. Si se omite, asume la fecha actual del servidor (`serverToday`). Devuelve metadatos con la fecha consultada (`targetDate`) y la fecha real del servidor (`serverToday`). Cada item de las listas `dueToday`, `overdue` y `paidToday` incluye la propiedad `currency` (`'BOB'` | `'USD'`) heredada del préstamo.
 
 ### Ejemplos de Body JSON para Postman:
 
@@ -143,8 +143,14 @@ DELETE /api/payments/:id                        → 200 OK (anular pago, requier
 ## Dashboard
 
 ```
-GET    /api/dashboard/today      → DashboardToday
+GET    /api/dashboard/home       → HomeDashboardResponseDto { capitalEnCalle: { BOB, USD }, loansSummary, clientsSummary, overdueInstallments[], generatedAt }
 ```
+
+> **Home Dashboard (`GET /api/dashboard/home`):** Retorna en una sola llamada las métricas financieras globales del Home de la app móvil:
+> - `capitalEnCalle`: Capital pendiente amortizado desglosado por moneda (`BOB` y `USD`).
+> - `loansSummary`: Total de préstamos activos, al día, en mora y porcentaje de morosidad (`delinquencyRate`).
+> - `clientsSummary`: Conteo de clientes (total, al día, en mora y sin préstamo activo).
+> - `overdueInstallments`: Cuotas vencidas priorizadas por días de atraso (`daysOverdue`), con desglose de cliente, cuota y moneda (`currency`).
 
 ---
 

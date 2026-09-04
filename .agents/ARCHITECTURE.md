@@ -76,7 +76,12 @@ src/
     dashboard/                     ← estándar NestJS
       dashboard.module.ts
       dashboard.controller.ts
-      dashboard.service.ts
+      dashboard.docs.ts
+      application/
+        use-cases/
+          get-home-dashboard.use-case.ts
+      dto/
+        home-dashboard-response.dto.ts
 
     stats/                         ← estándar NestJS
       stats.module.ts

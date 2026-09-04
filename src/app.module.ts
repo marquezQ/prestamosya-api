@@ -9,6 +9,7 @@ import { LoansModule } from './modules/loans/loans.module';
 import { GuaranteesModule } from './modules/guarantees/guarantees.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { CronModule } from './modules/cron/cron.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
 
@@ -22,6 +23,7 @@ import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
     GuaranteesModule,
     PaymentsModule,
     CronModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [
