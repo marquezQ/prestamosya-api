@@ -16,46 +16,57 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   console.log('🌱 Seeding database...\n');
 
-  // ─── Admins ──────────────────────────────────────────────────────────────
+  const passwordHash = await bcrypt.hash('123456', BCRYPT_ROUNDS);
 
-  const passwordHash = await bcrypt.hash('admin123', BCRYPT_ROUNDS);
-
-  const admin1 = await prisma.user.upsert({
-    where: { username: 'admin' },
-    update: { passwordHash },
-    create: {
-      name: 'Pedro Marquez Admin',
-      username: 'admin',
-      passwordHash,
-      role: 'admin',
-      isActive: true,
+  const initialUsers = [
+    {
+      name: 'Pedro Marquez',
+      username: 'pedromarquez',
+      businessName: 'Préstamos YA - Pedro Marquez',
     },
-  });
-  console.log(`✅ Admin 1: "${admin1.username}" (${admin1.id})`);
-
-  const admin2 = await prisma.user.upsert({
-    where: { username: 'admin2' },
-    update: { passwordHash },
-    create: {
-      name: 'Luis Marquez Admin',
-      username: 'admin2',
-      passwordHash,
-      role: 'admin',
-      isActive: true,
+    {
+      name: 'Luis Fernando Marquez',
+      username: 'luisfernandomarquez',
+      businessName: 'Préstamos YA - Luis Fernando Marquez',
     },
-  });
-  console.log(`✅ Admin 2: "${admin2.username}" (${admin2.id})`);
+    {
+      name: 'Prestamos BancoSol',
+      username: 'prestamosbancosol',
+      businessName: 'Prestamos BancoSol',
+    },
+    {
+      name: 'Juan Marquez',
+      username: 'juanmarquez',
+      businessName: 'Préstamos YA - Juan Marquez',
+    },
+  ];
 
-  // ─── Business configs ────────────────────────────────────────────────────
+  for (const u of initialUsers) {
+    const user = await prisma.user.upsert({
+      where: { username: u.username },
+      update: {
+        name: u.name,
+        passwordHash,
+        role: 'admin',
+        isActive: true,
+      },
+      create: {
+        name: u.name,
+        username: u.username,
+        passwordHash,
+        role: 'admin',
+        isActive: true,
+      },
+    });
 
-  for (const user of [admin1, admin2]) {
     await prisma.businessConfig.upsert({
       where: { userId: user.id },
-      update: {},
+      update: {
+        businessName: u.businessName,
+      },
       create: {
         userId: user.id,
-        businessName:
-          user.id === admin1.id ? 'PrestamosYA SRL' : 'Creditos Rápidos',
+        businessName: u.businessName,
         primaryCurrency: 'BOB',
         exchangeRate: 6.96,
         defaultInterestRate: 10.0,
@@ -63,105 +74,23 @@ async function main() {
         graceDays: 0,
       },
     });
+
+    console.log(
+      `✅ Usuario creado/actualizado: "${user.username}" (${user.name})`,
+    );
   }
-  console.log('✅ Business configs created for both admins');
 
-  // ─── Clients for Admin 1 (2 clients) ─────────────────────────────────────
-
-  const admin1Clients = [
-    {
-      fullName: 'Cliente Cumplido',
-      phone: '71234567',
-      idNumber: '1234567',
-      phoneAlt: '60123456',
-      address: 'Av. 16 de Julio 1234,',
-      status: 'CURRENT' as const,
-      notes: 'Cliente al día con sus pagos, prefiere cobro por las mañanas.',
-    },
-    {
-      fullName: 'Cliente Moroso',
-      phone: '72223344',
-      idNumber: '7654321',
-      phoneAlt: null,
-      address: 'Calle Comercio 567',
-      status: 'DELINQUENT' as const,
-      notes: 'Cliente con cuotas retrasadas.',
-    },
-  ];
-
-  for (const data of admin1Clients) {
-    await prisma.client.upsert({
-      where: { idNumber: data.idNumber },
-      update: {
-        fullName: data.fullName,
-        status: data.status,
-      },
-      create: {
-        userId: admin1.id,
-        fullName: data.fullName,
-        phone: data.phone,
-        idNumber: data.idNumber,
-        phoneAlt: data.phoneAlt,
-        address: data.address,
-        status: data.status,
-        notes: data.notes,
-      },
-    });
-  }
-  console.log(
-    `✅ ${admin1Clients.length} clients created for Admin 1 (Cumplido, Moroso)`,
-  );
-
-  // ─── Clients for Admin 2 (1 client) ──────────────────────────────────────
-
-  const admin2Clients = [
-    {
-      fullName: 'Cliente Ejemplo',
-      phone: '73445566',
-      idNumber: '9876543',
-      phoneAlt: null,
-      address: 'Av. Panorámica 890',
-      status: 'NO_LOAN' as const,
-      notes: 'Cliente de ejemplo para Admin 2.',
-    },
-  ];
-
-  for (const data of admin2Clients) {
-    await prisma.client.upsert({
-      where: { idNumber: data.idNumber },
-      update: {
-        fullName: data.fullName,
-        status: data.status,
-      },
-      create: {
-        userId: admin2.id,
-        fullName: data.fullName,
-        phone: data.phone,
-        idNumber: data.idNumber,
-        phoneAlt: data.phoneAlt,
-        address: data.address,
-        status: data.status,
-        notes: data.notes,
-      },
-    });
-  }
-  console.log(
-    `✅ ${admin2Clients.length} client created for Admin 2 (Ejemplo)`,
-  );
-
-  // ─── Done ────────────────────────────────────────────────────────────────
-
-  console.log('\n🌱 Seeding completed successfully.');
-  console.log('');
-  console.log('📋 Credentials:');
-  console.log('   Admin 1 — username: admin   / password: admin123');
-  console.log('   Admin 2 — username: admin2  / password: admin123');
-  console.log('   ⚠️  Change passwords in production.');
+  console.log('\n🌱 Seeding completado exitosamente.');
+  console.log('📋 Usuarios creados (contraseña para todos: 123456):');
+  console.log('   - pedromarquez');
+  console.log('   - luisfernandomarquez');
+  console.log('   - prestamosbancosol');
+  console.log('   - juanmarquez');
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Seeding failed:', e);
+    console.error('❌ Seeding falló:', e);
     process.exit(1);
   })
   .finally(async () => {

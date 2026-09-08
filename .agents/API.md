@@ -157,10 +157,21 @@ GET    /api/dashboard/home       → HomeDashboardResponseDto { capitalEnCalle: 
 ## Stats
 
 ```
-GET    /api/stats?period=week|month|year → BusinessStats
+GET  /api/stats/monthly?year=2026&month=9   → MonthlyStatsResponseDto
+GET  /api/stats/monthly-history?months=6   → MonthlyHistoryItemDto[]
 ```
 
----
+> **`GET /api/stats/monthly`:** Reporte financiero completo del mes consultado. Incluye 5 secciones:
+> - `period`: Metadatos del período (label, fechas, isCurrentMonth).
+> - `incomeBreakdown`: Interés cobrado, capital recuperado, efectivo total recibido y condonaciones (`discountsGiven`). Desglosado en `BOB` y `USD`. **La ganancia real es `interestCollected`, no `totalCashIn`** (el capital recuperado no es ganancia, es devolución de inversión).
+> - `performanceSummary`: Cuotas vencidas en el mes vs pagadas a tiempo / tarde / en mora / parciales. `collectionRate` (%), `expectedRevenue` vs `actualRevenue` y `revenueEfficiency` (%).
+> - `riskIndicators`: Tasa de morosidad actual, capital en riesgo, nuevos préstamos y clientes del mes, y préstamos saldados (`completedLoansCount`).
+> - `monthlyBalance`: Ganancia neta (`netProfit = interestCollected - discountsGiven`), capital desplegado en calle y retorno sobre capital (`returnOnCapital`). Todo desglosado en BOB y USD sin mezcla de monedas.
+>
+> Si `year` y `month` se omiten, devuelve el mes en curso según `America/La_Paz`.
+
+> **`GET /api/stats/monthly-history`:** Historial resumido de los últimos N meses para renderizar gráficas de barras o líneas en el frontend. **El arreglo se entrega en orden cronológico** (índice 0 = mes más antiguo, último índice = mes actual), listo para plotear de izquierda a derecha en el eje X. Cada ítem incluye: `interestCollected`, `netProfit`, `collectionRate` y `newLoansCount`. Opcional: `?months=6` (por defecto 6, máximo 24).
+
 
 ## Config
 

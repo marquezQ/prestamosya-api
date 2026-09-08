@@ -15,8 +15,9 @@ describe('Clients (e2e)', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
-    adminToken = (await login(app, 'admin', 'admin123')).accessToken;
-    admin2Token = (await login(app, 'admin2', 'admin123')).accessToken;
+    adminToken = (await login(app, 'pedromarquez', '123456')).accessToken;
+    admin2Token = (await login(app, 'luisfernandomarquez', '123456'))
+      .accessToken;
   });
 
   afterAll(async () => {
@@ -25,7 +26,6 @@ describe('Clients (e2e)', () => {
 
   describe('CRUD /api/clients', () => {
     let clientId: string;
-    // idNumber único por corrida: el CI es @unique, evita 409 en re-ejecuciones.
     const uniqueIdNumber = `E2E-${Date.now()}`;
 
     it('POST crea un cliente', async () => {
@@ -42,6 +42,34 @@ describe('Clients (e2e)', () => {
 
       expect(body.data.fullName).toBe('Cliente E2E');
       clientId = body.data.id;
+    });
+
+    it('POST con mismo idNumber en OTRO admin se crea exitosamente (multitenant CI)', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/clients')
+        .set('Authorization', `Bearer ${admin2Token}`)
+        .send({
+          fullName: 'Cliente E2E Mismo CI',
+          phone: '70000999',
+          idNumber: uniqueIdNumber,
+        })
+        .expect(201);
+      const body = res.body as { data: { fullName: string; id: string } };
+
+      expect(body.data.fullName).toBe('Cliente E2E Mismo CI');
+      expect(body.data.id).not.toBe(clientId);
+    });
+
+    it('POST con mismo idNumber en el MISMO admin lanza 409 conflicto', async () => {
+      await request(app.getHttpServer())
+        .post('/api/clients')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          fullName: 'Cliente Duplicado Mismo Admin',
+          phone: '70000888',
+          idNumber: uniqueIdNumber,
+        })
+        .expect(409);
     });
 
     it('GET lista los clientes del admin autenticado', async () => {
@@ -69,7 +97,6 @@ describe('Clients (e2e)', () => {
       };
 
       expect(body.data.client.fullName).toBe('Cliente E2E');
-      // El perfil expone los dos grupos de préstamos y las garantías.
       expect(body.data.activeLoans).toBeDefined();
       expect(body.data.completedLoans).toBeDefined();
       expect(body.data.guarantees).toBeDefined();
@@ -105,7 +132,6 @@ describe('Clients (e2e)', () => {
 
   describe('Aislamiento entre admins', () => {
     it('GET :id no expone clientes de otro admin (404)', async () => {
-      // El seed crea clientes del admin2; su primer cliente es de otro admin.
       const admin2Clients = await request(app.getHttpServer())
         .get('/api/clients')
         .set('Authorization', `Bearer ${admin2Token}`)
