@@ -10,6 +10,7 @@ import { GuaranteesModule } from './modules/guarantees/guarantees.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { CronModule } from './modules/cron/cron.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { StatsModule } from './modules/stats/stats.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
 
@@ -24,6 +25,7 @@ import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
     PaymentsModule,
     CronModule,
     DashboardModule,
+    StatsModule,
   ],
   controllers: [AppController],
   providers: [
