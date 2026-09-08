@@ -39,6 +39,11 @@ async function main() {
       username: 'juanmarquez',
       businessName: 'Préstamos YA - Juan Marquez',
     },
+    {
+      name: 'Usuario Prueba',
+      username: 'usuarioprueba',
+      businessName: 'Préstamos YA - Usuario Prueba',
+    },
   ];
 
   for (const u of initialUsers) {

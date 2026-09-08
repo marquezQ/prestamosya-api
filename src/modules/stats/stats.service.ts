@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { getTodayLaPaz } from '../../common/utils/date.utils';
+import { getTodayLaPaz, getStartOfDay } from '../../common/utils/date.utils';
 import {
   CurrencyAmountDto,
   IncomeBreakdownDto,
@@ -84,17 +84,25 @@ export class StatsService {
     const today = getTodayLaPaz();
     const isCurrentMonth = today >= startOfMonth && today < endOfMonth;
 
-    const [
-      incomeBreakdown,
-      performanceSummary,
-      riskIndicators,
-      monthlyBalance,
-    ] = await Promise.all([
+    const [incomeBreakdown, activePortfolio] = await Promise.all([
       this._computeIncomeBreakdown(userId, startOfMonth, endOfMonth),
-      this._computePerformanceSummary(userId, startOfMonth, endOfMonth, today),
-      this._computeRiskIndicators(userId, startOfMonth, endOfMonth),
-      this._computeMonthlyBalance(userId),
+      this._computeActivePortfolioMetrics(userId, today),
     ]);
+
+    const [performanceSummary, riskIndicators] = await Promise.all([
+      this._computePerformanceSummary(userId, startOfMonth, endOfMonth, today),
+      this._computeRiskIndicators(
+        userId,
+        startOfMonth,
+        endOfMonth,
+        activePortfolio,
+      ),
+    ]);
+
+    const monthlyBalance = this._computeMonthlyBalance(
+      incomeBreakdown,
+      activePortfolio.capitalDeployed,
+    );
 
     const lastDayOfMonth = new Date(endOfMonth);
     lastDayOfMonth.setUTCDate(lastDayOfMonth.getUTCDate() - 1);
@@ -403,79 +411,45 @@ export class StatsService {
 
   /**
    * Calcula los indicadores de riesgo del mes:
-   * morosidad, capital en riesgo, nuevos préstamos, clientes y refinanciamientos.
+   * morosidad, capital en riesgo, nuevos préstamos, clientes.
    */
   private async _computeRiskIndicators(
     userId: string,
     startOfMonth: Date,
     endOfMonth: Date,
+    activePortfolio: {
+      portfolioAtRisk: ByCurrency;
+      delinquencyRate: number;
+    },
   ): Promise<RiskIndicatorsDto> {
-    const [activeLoans, newLoans, completedLoansCount, newClientsCount] =
-      await Promise.all([
-        // Préstamos activos con sus cuotas para detectar morosidad
-        this.prisma.loan.findMany({
-          where: {
-            createdBy: userId,
-            status: 'ACTIVE',
-            client: { deletedAt: null },
-          },
-          select: {
-            id: true,
-            currency: true,
-            outstandingBalance: true,
-            installments: {
-              where: { archived: false, status: 'OVERDUE' },
-              select: { id: true },
-              take: 1, // Solo necesitamos saber si existe al menos 1
-            },
-          },
-        }),
-        // Préstamos nuevos desembolsados en el mes
-        this.prisma.loan.findMany({
-          where: {
-            createdBy: userId,
-            startDate: { gte: startOfMonth, lt: endOfMonth },
-            client: { deletedAt: null },
-          },
-          select: { capitalAmount: true, currency: true },
-        }),
-        // Préstamos saldados en el mes
-        this.prisma.loan.count({
-          where: {
-            createdBy: userId,
-            status: 'COMPLETED',
-            updatedAt: { gte: startOfMonth, lt: endOfMonth },
-            client: { deletedAt: null },
-          },
-        }),
-        // Nuevos clientes del mes
-        this.prisma.client.count({
-          where: {
-            userId,
-            deletedAt: null,
-            createdAt: { gte: startOfMonth, lt: endOfMonth },
-          },
-        }),
-      ]);
-
-    // Calcular morosidad y capital en riesgo
-    const portfolioAtRisk: ByCurrency = { BOB: 0, USD: 0 };
-    let delinquentCount = 0;
-
-    for (const loan of activeLoans) {
-      const isDelinquent = loan.installments.length > 0;
-      if (isDelinquent) {
-        delinquentCount++;
-        const currency = loan.currency;
-        portfolioAtRisk[currency] = this._round(
-          portfolioAtRisk[currency] + Number(loan.outstandingBalance),
-        );
-      }
-    }
-
-    const totalActive = activeLoans.length;
-    const delinquencyRate =
-      totalActive > 0 ? this._round((delinquentCount / totalActive) * 100) : 0;
+    const [newLoans, completedLoansCount, newClientsCount] = await Promise.all([
+      // Préstamos nuevos desembolsados en el mes
+      this.prisma.loan.findMany({
+        where: {
+          createdBy: userId,
+          startDate: { gte: startOfMonth, lt: endOfMonth },
+          client: { deletedAt: null },
+        },
+        select: { capitalAmount: true, currency: true },
+      }),
+      // Préstamos saldados en el mes
+      this.prisma.loan.count({
+        where: {
+          createdBy: userId,
+          status: 'COMPLETED',
+          updatedAt: { gte: startOfMonth, lt: endOfMonth },
+          client: { deletedAt: null },
+        },
+      }),
+      // Nuevos clientes del mes
+      this.prisma.client.count({
+        where: {
+          userId,
+          deletedAt: null,
+          createdAt: { gte: startOfMonth, lt: endOfMonth },
+        },
+      }),
+    ]);
 
     // Agrupar capital de nuevos préstamos por moneda
     const newLoansCapital: ByCurrency = { BOB: 0, USD: 0 };
@@ -487,8 +461,8 @@ export class StatsService {
     }
 
     return {
-      delinquencyRate,
-      portfolioAtRisk,
+      delinquencyRate: activePortfolio.delinquencyRate,
+      portfolioAtRisk: activePortfolio.portfolioAtRisk,
       newLoansCount: newLoans.length,
       newLoansCapital,
       completedLoansCount,
@@ -497,43 +471,97 @@ export class StatsService {
   }
 
   /**
-   * Calcula el balance general actual del prestamista:
-   * ganancia neta, capital desplegado y retorno sobre capital.
-   *
-   * IMPORTANTE: El balance usa el estado ACTUAL de la cartera (en tiempo real),
-   * no el estado al final del mes consultado. Esto permite que el reporte
-   * de meses pasados muestre igualmente la salud actual del portafolio.
+   * Obtiene la foto actual de la cartera activa:
+   * Capital en calle (capitalDeployed) y Capital en riesgo (portfolioAtRisk).
+   * Basado estrictamente en amortización de capital puro pendiente (igual que Home Dashboard).
    */
-  private async _computeMonthlyBalance(
-    userId: string,
-  ): Promise<MonthlyBalanceDto> {
-    // Usamos el incomeBreakdown del mes actual para calcular netProfit
-    const today = getTodayLaPaz();
-    const { startOfMonth, endOfMonth } = this._getMonthBounds(
-      today.getUTCFullYear(),
-      today.getUTCMonth() + 1,
-    );
-
-    const [income, activeLoans] = await Promise.all([
-      this._computeIncomeBreakdown(userId, startOfMonth, endOfMonth),
-      this.prisma.loan.findMany({
-        where: {
-          createdBy: userId,
-          status: 'ACTIVE',
-          client: { deletedAt: null },
+  private async _computeActivePortfolioMetrics(userId: string, today: Date) {
+    const activeLoans = await this.prisma.loan.findMany({
+      where: {
+        createdBy: userId,
+        status: 'ACTIVE',
+        client: { deletedAt: null },
+      },
+      select: {
+        id: true,
+        currency: true,
+        installments: {
+          where: { archived: false },
+          select: {
+            dueDate: true,
+            interestAmount: true,
+            totalAmount: true,
+            paidAmount: true,
+            status: true,
+          },
         },
-        select: { outstandingBalance: true, currency: true },
-      }),
-    ]);
+      },
+    });
 
     const capitalDeployed: ByCurrency = { BOB: 0, USD: 0 };
+    const portfolioAtRisk: ByCurrency = { BOB: 0, USD: 0 };
+    let delinquentCount = 0;
+
     for (const loan of activeLoans) {
       const currency = loan.currency;
+      let loanIsDelinquent = false;
+      let loanRemainingCapital = 0;
+
+      for (const inst of loan.installments) {
+        if (inst.status !== 'PAID') {
+          const totalAmt = Number(inst.totalAmount);
+          const interestAmt = Number(inst.interestAmount);
+          const paidAmt = Number(inst.paidAmount);
+
+          const remainingInterest = Math.max(0, interestAmt - paidAmt);
+          const remainingCapital = Math.max(
+            0,
+            totalAmt - paidAmt - remainingInterest,
+          );
+
+          loanRemainingCapital += remainingCapital;
+
+          const instDueDate = getStartOfDay(new Date(inst.dueDate));
+          if (inst.status === 'OVERDUE' || instDueDate < today) {
+            loanIsDelinquent = true;
+          }
+        }
+      }
+
+      const roundedLoanCapital = this._round(loanRemainingCapital);
       capitalDeployed[currency] = this._round(
-        capitalDeployed[currency] + Number(loan.outstandingBalance),
+        capitalDeployed[currency] + roundedLoanCapital,
       );
+
+      if (loanIsDelinquent) {
+        delinquentCount++;
+        portfolioAtRisk[currency] = this._round(
+          portfolioAtRisk[currency] + roundedLoanCapital,
+        );
+      }
     }
 
+    const totalActive = activeLoans.length;
+    const delinquencyRate =
+      totalActive > 0 ? this._round((delinquentCount / totalActive) * 100) : 0;
+
+    return {
+      capitalDeployed,
+      portfolioAtRisk,
+      delinquentCount,
+      totalActive,
+      delinquencyRate,
+    };
+  }
+
+  /**
+   * Calcula el balance general del prestamista para el mes consultado:
+   * ganancia neta, capital desplegado y retorno sobre capital.
+   */
+  private _computeMonthlyBalance(
+    income: IncomeBreakdownDto,
+    capitalDeployed: ByCurrency,
+  ): MonthlyBalanceDto {
     const netProfit: ByCurrency = {
       BOB: this._round(
         income.interestCollected.BOB - income.discountsGiven.BOB,
