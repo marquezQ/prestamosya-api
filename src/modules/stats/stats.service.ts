@@ -210,25 +210,14 @@ export class StatsService {
         paymentDate: { gte: startOfMonth, lt: endOfMonth },
       },
       select: {
-        paymentDate: true,
         discountAmount: true,
         loan: { select: { currency: true } },
         installmentLinks: {
           select: {
-            amountApplied: true,
-            installment: {
-              select: {
-                id: true,
-                interestAmount: true,
-                paidAmount: true,
-                // Traer TODOS los links de pago de esta cuota (no anulados)
-                // para calcular el efectivo histórico real sin contaminar con descuentos.
-                paymentLinks: {
-                  where: { payment: { voided: false } },
-                  select: { amountApplied: true },
-                },
-              },
-            },
+            interestPaid: true,
+            capitalPaid: true,
+            interestDiscounted: true,
+            capitalDiscounted: true,
           },
         },
       },
@@ -239,19 +228,9 @@ export class StatsService {
     const capitalRecovered: ByCurrency = { BOB: 0, USD: 0 };
     const discountsGiven: ByCurrency = { BOB: 0, USD: 0 };
 
-    /**
-     * Mapa para acumular cuánto hemos procesado de cada cuota en el mes.
-     * Clave: installmentId, Valor: suma de amountApplied ya procesados.
-     *
-     * Esto permite calcular el interés que ya estaba cubierto ANTES de cada
-     * pago del mes (paidBefore = paidAmount en BD - amountAppliedEnElMesAntesDeEstePago).
-     */
-    const monthlyAppliedMap = new Map<string, number>();
-
     for (const payment of payments) {
       const currency = payment.loan.currency;
 
-      // Acumular descuentos por condonaciones (liquidaciones anticipadas)
       if (payment.discountAmount) {
         discountsGiven[currency] = this._round(
           discountsGiven[currency] + Number(payment.discountAmount),
@@ -259,47 +238,14 @@ export class StatsService {
       }
 
       for (const link of payment.installmentLinks) {
-        const installmentId = link.installment.id;
-        const amountApplied = Number(link.amountApplied);
-        const interestAmount = Number(link.installment.interestAmount);
-
-        // Suma histórica de todo el efectivo aplicado a esta cuota (de todos los pagos no anulados).
-        // Usar esto en lugar de installment.paidAmount elimina la contaminación con discountApplied.
-        const totalCashPaidForInstallment = link.installment.paymentLinks
-          ? link.installment.paymentLinks.reduce(
-              (sum, pl) => sum + Number(pl.amountApplied),
-              0,
-            )
-          : Number(link.installment.paidAmount);
-
-        // paidBefore = efectivo acumulado históricamente menos lo ya procesado este mes
-        // y menos el amountApplied del link actual.
-        const alreadyProcessedThisMonth =
-          monthlyAppliedMap.get(installmentId) ?? 0;
-        const paidBefore = Math.max(
-          0,
-          totalCashPaidForInstallment -
-            alreadyProcessedThisMonth -
-            amountApplied,
-        );
-
-        const { toInterest, toCapital } = this._splitPayment(
-          amountApplied,
-          interestAmount,
-          paidBefore,
-        );
+        const interestPaid = Number(link.interestPaid ?? 0);
+        const capitalPaid = Number(link.capitalPaid ?? 0);
 
         interestCollected[currency] = this._round(
-          interestCollected[currency] + toInterest,
+          interestCollected[currency] + interestPaid,
         );
         capitalRecovered[currency] = this._round(
-          capitalRecovered[currency] + toCapital,
-        );
-
-        // Actualizar el acumulador del mes para la siguiente iteración
-        monthlyAppliedMap.set(
-          installmentId,
-          alreadyProcessedThisMonth + amountApplied,
+          capitalRecovered[currency] + capitalPaid,
         );
       }
     }
@@ -345,7 +291,7 @@ export class StatsService {
         paymentLinks: {
           where: { payment: { voided: false } },
           select: {
-            amountApplied: true,
+            interestPaid: true,
             payment: { select: { paymentDate: true } },
           },
           orderBy: { payment: { paymentDate: 'asc' } },
@@ -369,22 +315,17 @@ export class StatsService {
         expectedRevenue[currency] + interestAmt,
       );
 
-      // Interés realmente cobrado de esta cuota — usando solo efectivo real.
-      // SUM(paymentLinks.amountApplied) excluye el discountApplied, evitando
-      // que cuotas condonadas inflen el actualRevenue del mes.
-      const cashPaidForInstallment = inst.paymentLinks
+      // Interés realmente cobrado en efectivo para esta cuota
+      const interestPaidForInstallment = inst.paymentLinks
         ? inst.paymentLinks.reduce(
-            (sum, pl) => sum + Number(pl.amountApplied),
+            (sum, pl) => sum + Number(pl.interestPaid ?? 0),
             0,
           )
-        : Number(inst.paidAmount);
-      const { toInterest } = this._splitPayment(
-        cashPaidForInstallment,
-        interestAmt,
-        0,
-      );
+        : 0;
+
       actualRevenue[currency] = this._round(
-        actualRevenue[currency] + toInterest,
+        actualRevenue[currency] +
+          Math.min(interestAmt, interestPaidForInstallment),
       );
 
       if (inst.status === 'PAID') {

@@ -18,16 +18,20 @@ export interface CreatePaymentData {
   notes: string | null;
   installmentLinks: Array<{
     installmentId: string;
-    amountApplied: string; // Decimal como string — dinero físico real (ej: "400.00")
-    discountApplied: string; // Decimal como string — monto condonado (ej: "0.00"). Siempre presente.
+    interestPaid: string; // Dinero físico asignado a interés (ej: "100.00")
+    capitalPaid: string; // Dinero físico asignado a capital (ej: "300.00")
+    interestDiscounted: string; // Descuento condonado asignado a interés (ej: "0.00")
+    capitalDiscounted: string; // Descuento condonado asignado a capital (ej: "0.00")
   }>;
 }
 
 export interface PaymentInstallmentLink {
   id: string;
   installmentId: string;
-  amountApplied: string; // Dinero físico aplicado a esta cuota
-  discountApplied: string; // Monto condonado aplicado a esta cuota
+  interestPaid: string;
+  capitalPaid: string;
+  interestDiscounted: string;
+  capitalDiscounted: string;
 }
 
 export interface PaymentRecord {

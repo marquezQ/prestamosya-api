@@ -185,13 +185,17 @@ describe('RegisterPaymentUseCase', () => {
       installmentLinks: [
         {
           installmentId: 'inst-1',
-          amountApplied: '400.00',
-          discountApplied: '0.00',
+          interestPaid: '100.00',
+          capitalPaid: '300.00',
+          interestDiscounted: '0.00',
+          capitalDiscounted: '0.00',
         },
         {
           installmentId: 'inst-2',
-          amountApplied: '100.00',
-          discountApplied: '0.00',
+          interestPaid: '100.00',
+          capitalPaid: '0.00',
+          interestDiscounted: '0.00',
+          capitalDiscounted: '0.00',
         },
       ],
     });

@@ -106,23 +106,26 @@ export class RegisterPaymentUseCase {
       //       - PaymentExceedsBalanceError si el monto supera el saldo
       loan.applyPayment(paymentAmount);
 
-      // 2c. Distribuir FIFO entre cuotas pendientes
-      //     installment.applyPayment(amount) retorna el sobrante que no se pudo aplicar.
-      //     Iteramos hasta que el sobrante sea 0 o se acaben las cuotas.
+      // 2c. Distribuir FIFO entre cuotas pendientes (Interés primero, Capital después)
       let remaining = paymentAmount;
       const affectedInstallments: Array<{
         installment: InstallmentEntity;
-        applied: Money;
+        interestPaid: Money;
+        capitalPaid: Money;
       }> = [];
 
       for (const installment of loan.installments) {
         if (remaining.isZero()) break;
 
-        const surplus = installment.applyPayment(remaining);
-        const applied = remaining.subtract(surplus);
+        const { surplus, interestPaid, capitalPaid } =
+          installment.applyPaymentDetailed(remaining);
 
-        if (!applied.isZero()) {
-          affectedInstallments.push({ installment, applied });
+        if (!interestPaid.isZero() || !capitalPaid.isZero()) {
+          affectedInstallments.push({
+            installment,
+            interestPaid,
+            capitalPaid,
+          });
         }
 
         remaining = surplus;
@@ -137,10 +140,12 @@ export class RegisterPaymentUseCase {
         method: input.method,
         notes: input.notes ?? null,
         installmentLinks: affectedInstallments.map(
-          ({ installment, applied }) => ({
+          ({ installment, interestPaid, capitalPaid }) => ({
             installmentId: installment.id!,
-            amountApplied: applied.toString(),
-            discountApplied: '0.00',
+            interestPaid: interestPaid.toString(),
+            capitalPaid: capitalPaid.toString(),
+            interestDiscounted: '0.00',
+            capitalDiscounted: '0.00',
           }),
         ),
       });
@@ -162,10 +167,10 @@ export class RegisterPaymentUseCase {
         paymentDate: input.paymentDate,
         notes: input.notes ?? null,
         affectedInstallments: affectedInstallments.map(
-          ({ installment, applied }) => ({
+          ({ installment, interestPaid, capitalPaid }) => ({
             installmentId: installment.id!,
             installmentNumber: installment.installmentNumber,
-            amountApplied: applied.toNumber(),
+            amountApplied: interestPaid.add(capitalPaid).toNumber(),
             newStatus: installment.status,
             remainingAmount: installment.remainingAmount.toNumber(),
           }),

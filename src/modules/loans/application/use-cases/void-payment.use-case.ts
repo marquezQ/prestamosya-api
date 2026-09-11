@@ -73,7 +73,10 @@ export class VoidPaymentUseCase {
 
         if (installment) {
           const totalApplied = Money.of(
-            Number(link.amountApplied) + Number(link.discountApplied),
+            Number(link.interestPaid) +
+              Number(link.capitalPaid) +
+              Number(link.interestDiscounted) +
+              Number(link.capitalDiscounted),
             loan.currency,
           );
           installment.revertPayment(totalApplied);

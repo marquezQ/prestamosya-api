@@ -106,72 +106,120 @@ export class SettleLoanUseCase {
       // Lanza: LoanNotActiveError, SettlementExceedsBalanceError, SettlementDoesNotClearBalanceError
       loan.settleEarly(paymentAmount, discountAmount);
 
-      // 2c. Distribuir el monto físico (FIFO) en cuotas pendientes
-      const settledInstallments: Array<{
-        installment: InstallmentEntity;
-        amountApplied: Money;
-        discountApplied: Money;
-      }> = [];
-
-      let remainingPayment = paymentAmount;
-
-      for (const installment of loan.installments) {
-        if (remainingPayment.isZero()) break;
-
-        const surplus = installment.applyPayment(remainingPayment);
-        const applied = remainingPayment.subtract(surplus);
-
-        if (!applied.isZero()) {
-          settledInstallments.push({
-            installment,
-            amountApplied: applied,
-            discountApplied: Money.of(0, loan.currency),
-          });
+      // 2c. Mapa para acumular desgloses explícitos por cuota
+      const settledMap = new Map<
+        string,
+        {
+          installment: InstallmentEntity;
+          interestPaid: Money;
+          capitalPaid: Money;
+          interestDiscounted: Money;
+          capitalDiscounted: Money;
         }
+      >();
 
-        remainingPayment = surplus;
-      }
+      const zeroMoney = Money.of(0, loan.currency);
 
-      // 2d. Distribuir el descuento (discount) en las cuotas que quedan pendientes
-      //     Estas cuotas se marcan PAID gracias al descuento/condonación
+      const getOrCreateSettled = (inst: InstallmentEntity) => {
+        let entry = settledMap.get(inst.id!);
+        if (!entry) {
+          entry = {
+            installment: inst,
+            interestPaid: zeroMoney,
+            capitalPaid: zeroMoney,
+            interestDiscounted: zeroMoney,
+            capitalDiscounted: zeroMoney,
+          };
+          settledMap.set(inst.id!, entry);
+        }
+        return entry;
+      };
+
+      // 2d. Distribuir el descuento (discountAmount) PRIMERO sobre el interés no cubierto
+      //     de las cuotas pendientes (condonación de interés futuro).
       let remainingDiscount = discountAmount;
 
       for (const installment of loan.installments) {
         if (remainingDiscount.isZero()) break;
         if (installment.isPaid) continue;
 
-        const surplus = installment.applyPayment(remainingDiscount);
-        const discountApplied = remainingDiscount.subtract(surplus);
+        const currentPaid = installment.paidAmount;
+        const interestAmt = installment.interestAmount;
+        const interestUnpaid = interestAmt.isGreaterThan(currentPaid)
+          ? interestAmt.subtract(currentPaid)
+          : zeroMoney;
 
-        if (!discountApplied.isZero()) {
-          // Verificar si ya está registrada en settledInstallments (pago parcial + descuento)
-          const existing = settledInstallments.find(
-            (s) => s.installment.id === installment.id,
-          );
+        if (!interestUnpaid.isZero()) {
+          const discountToApply = remainingDiscount.isGreaterThan(
+            interestUnpaid,
+          )
+            ? interestUnpaid
+            : remainingDiscount;
 
-          if (existing) {
-            existing.discountApplied = discountApplied;
-          } else {
-            settledInstallments.push({
-              installment,
-              amountApplied: Money.of(0, loan.currency),
-              discountApplied,
-            });
+          const surplus = installment.applyPayment(discountToApply);
+          const applied = discountToApply.subtract(surplus);
+
+          if (!applied.isZero()) {
+            const entry = getOrCreateSettled(installment);
+            entry.interestDiscounted = entry.interestDiscounted.add(applied);
           }
+
+          remainingDiscount = remainingDiscount.subtract(applied);
+        }
+      }
+
+      // Si aún queda excedente de descuento, aplicarlo como descuento a capital
+      for (const installment of loan.installments) {
+        if (remainingDiscount.isZero()) break;
+        if (installment.isPaid) continue;
+
+        const surplus = installment.applyPayment(remainingDiscount);
+        const applied = remainingDiscount.subtract(surplus);
+
+        if (!applied.isZero()) {
+          const entry = getOrCreateSettled(installment);
+          entry.capitalDiscounted = entry.capitalDiscounted.add(applied);
         }
 
         remainingDiscount = surplus;
       }
 
-      // 2e. Persistir en la transacción
-      // Se incluyen TODOS los settledInstallments (amountApplied y/o discountApplied).
-      // Antes se filtraban los de amountApplied=0, perdiendo el registro de cuotas
-      // cubiertas solo por condonación — lo que causaba bugs en stats y en void.
+      // 2e. Distribuir el dinero físico (paymentAmount / cash) SEGUNDO
+      //     usando applyPaymentDetailed para registrar interés pagado y capital pagado.
+      let remainingPayment = paymentAmount;
+
+      for (const installment of loan.installments) {
+        if (remainingPayment.isZero()) break;
+        if (installment.isPaid) continue;
+
+        const { surplus, interestPaid, capitalPaid } =
+          installment.applyPaymentDetailed(remainingPayment);
+
+        if (!interestPaid.isZero() || !capitalPaid.isZero()) {
+          const entry = getOrCreateSettled(installment);
+          entry.interestPaid = entry.interestPaid.add(interestPaid);
+          entry.capitalPaid = entry.capitalPaid.add(capitalPaid);
+        }
+
+        remainingPayment = surplus;
+      }
+
+      const settledInstallments = Array.from(settledMap.values());
+
+      // 2f. Persistir en la transacción
       const installmentLinks = settledInstallments.map(
-        ({ installment, amountApplied, discountApplied }) => ({
+        ({
+          installment,
+          interestPaid,
+          capitalPaid,
+          interestDiscounted,
+          capitalDiscounted,
+        }) => ({
           installmentId: installment.id!,
-          amountApplied: amountApplied.toString(),
-          discountApplied: discountApplied.toString(),
+          interestPaid: interestPaid.toString(),
+          capitalPaid: capitalPaid.toString(),
+          interestDiscounted: interestDiscounted.toString(),
+          capitalDiscounted: capitalDiscounted.toString(),
         }),
       );
 
@@ -205,11 +253,19 @@ export class SettleLoanUseCase {
         paymentDate: input.paymentDate,
         notes: input.notes ?? null,
         settledInstallments: settledInstallments.map(
-          ({ installment, amountApplied, discountApplied }) => ({
+          ({
+            installment,
+            interestPaid,
+            capitalPaid,
+            interestDiscounted,
+            capitalDiscounted,
+          }) => ({
             installmentId: installment.id!,
             installmentNumber: installment.installmentNumber,
-            amountApplied: amountApplied.toNumber(),
-            discountApplied: discountApplied.toNumber(),
+            amountApplied: interestPaid.add(capitalPaid).toNumber(),
+            discountApplied: interestDiscounted
+              .add(capitalDiscounted)
+              .toNumber(),
           }),
         ),
         loanStatus: loan.status,
