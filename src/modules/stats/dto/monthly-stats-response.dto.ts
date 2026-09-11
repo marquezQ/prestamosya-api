@@ -65,6 +65,12 @@ export class IncomeBreakdownDto {
       'Interés condonado en liquidaciones anticipadas del mes (discount en payments/settle). No suma a la ganancia.',
   })
   discountsGiven: CurrencyAmountDto;
+
+  @ApiProperty({
+    type: CurrencyAmountDto,
+    description: 'Descuento o pérdida directa de capital otorgada en el mes.',
+  })
+  capitalDiscounted: CurrencyAmountDto;
 }
 
 // ─── Sección 3: Rendimiento del mes ──────────────────────────────────────────
@@ -180,7 +186,7 @@ export class MonthlyBalanceDto {
   @ApiProperty({
     type: CurrencyAmountDto,
     description:
-      'Ganancia neta del período: interestCollected - discountsGiven. Nunca mezcla BOB y USD.',
+      'Ganancia neta del período: interestCollected - capitalDiscounted. Nunca mezcla BOB y USD.',
   })
   netProfit: CurrencyAmountDto;
 

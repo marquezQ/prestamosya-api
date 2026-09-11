@@ -162,10 +162,10 @@ export class StatsService {
         interestCollected: income.interestCollected,
         netProfit: {
           BOB: this._round(
-            income.interestCollected.BOB - income.discountsGiven.BOB,
+            income.interestCollected.BOB - income.capitalDiscounted.BOB,
           ),
           USD: this._round(
-            income.interestCollected.USD - income.discountsGiven.USD,
+            income.interestCollected.USD - income.capitalDiscounted.USD,
           ),
         },
         collectionRate: performance.collectionRate,
@@ -227,6 +227,7 @@ export class StatsService {
     const interestCollected: ByCurrency = { BOB: 0, USD: 0 };
     const capitalRecovered: ByCurrency = { BOB: 0, USD: 0 };
     const discountsGiven: ByCurrency = { BOB: 0, USD: 0 };
+    const capitalDiscounted: ByCurrency = { BOB: 0, USD: 0 };
 
     for (const payment of payments) {
       const currency = payment.loan.currency;
@@ -240,12 +241,16 @@ export class StatsService {
       for (const link of payment.installmentLinks) {
         const interestPaid = Number(link.interestPaid ?? 0);
         const capitalPaid = Number(link.capitalPaid ?? 0);
+        const capDiscounted = Number(link.capitalDiscounted ?? 0);
 
         interestCollected[currency] = this._round(
           interestCollected[currency] + interestPaid,
         );
         capitalRecovered[currency] = this._round(
           capitalRecovered[currency] + capitalPaid,
+        );
+        capitalDiscounted[currency] = this._round(
+          capitalDiscounted[currency] + capDiscounted,
         );
       }
     }
@@ -258,6 +263,7 @@ export class StatsService {
         USD: this._round(interestCollected.USD + capitalRecovered.USD),
       },
       discountsGiven,
+      capitalDiscounted,
     };
   }
 
@@ -533,10 +539,10 @@ export class StatsService {
   ): MonthlyBalanceDto {
     const netProfit: ByCurrency = {
       BOB: this._round(
-        income.interestCollected.BOB - income.discountsGiven.BOB,
+        income.interestCollected.BOB - income.capitalDiscounted.BOB,
       ),
       USD: this._round(
-        income.interestCollected.USD - income.discountsGiven.USD,
+        income.interestCollected.USD - income.capitalDiscounted.USD,
       ),
     };
 
