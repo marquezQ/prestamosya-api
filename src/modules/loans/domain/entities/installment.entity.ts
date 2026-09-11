@@ -70,6 +70,60 @@ export class InstallmentEntity {
   }
 
   /**
+   * Aplica un pago a esta cuota desglosando explícitamente cuánto se destina a interés y a capital.
+   * Regla bancaria comercial: primero se cubre el interés pendiente, luego el capital.
+   */
+  applyPaymentDetailed(amount: Money): {
+    surplus: Money;
+    interestPaid: Money;
+    capitalPaid: Money;
+  } {
+    const zero = Money.zero(this.totalAmount.currency);
+    if (this.isPaid || this.isArchived || amount.isZero()) {
+      return { surplus: amount, interestPaid: zero, capitalPaid: zero };
+    }
+
+    const currentPaid = this.paidAmount;
+    const interestPaidBefore = currentPaid.isGreaterThan(this.interestAmount)
+      ? this.interestAmount
+      : currentPaid;
+    const interestUnpaid = this.interestAmount.subtract(interestPaidBefore);
+
+    // 1. Cubrir interés pendiente primero
+    const interestPaid = amount.isGreaterThan(interestUnpaid)
+      ? interestUnpaid
+      : amount;
+    let remaining = amount.subtract(interestPaid);
+
+    // 2. Cubrir capital pendiente después
+    const capitalPaidBefore = currentPaid.isGreaterThan(this.interestAmount)
+      ? currentPaid.subtract(this.interestAmount)
+      : zero;
+    const capitalUnpaid = this.capitalAmount.isGreaterThan(capitalPaidBefore)
+      ? this.capitalAmount.subtract(capitalPaidBefore)
+      : zero;
+
+    const capitalPaid = remaining.isGreaterThan(capitalUnpaid)
+      ? capitalUnpaid
+      : remaining;
+    remaining = remaining.subtract(capitalPaid);
+
+    const totalApplied = interestPaid.add(capitalPaid);
+    this.paidAmount = this.paidAmount.add(totalApplied);
+    this.recalculateStatus();
+
+    if (this.isPaid) {
+      this.paidAt = new Date();
+    }
+
+    return {
+      surplus: remaining,
+      interestPaid,
+      capitalPaid,
+    };
+  }
+
+  /**
    * Revierte un pago previamente aplicado a esta cuota.
    *
    * @param amount - Monto a revertir (debe ser <= paidAmount)

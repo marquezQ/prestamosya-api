@@ -231,12 +231,10 @@ describe('StatsService', () => {
           loan: { currency: 'BOB' },
           installmentLinks: [
             {
-              amountApplied: '100',
-              installment: {
-                id: 'inst-1',
-                interestAmount: '100',
-                paidAmount: '100', // ya pagado total (como si fuera la primera vez)
-              },
+              interestPaid: '100',
+              capitalPaid: '0',
+              interestDiscounted: '0',
+              capitalDiscounted: '0',
             },
           ],
         },
@@ -267,12 +265,10 @@ describe('StatsService', () => {
           loan: { currency: 'BOB' },
           installmentLinks: [
             {
-              amountApplied: '433.33',
-              installment: {
-                id: 'inst-1',
-                interestAmount: '100',
-                paidAmount: '433.33', // paidAmount final en BD
-              },
+              interestPaid: '100',
+              capitalPaid: '333.33',
+              interestDiscounted: '0',
+              capitalDiscounted: '0',
             },
           ],
         },
@@ -324,12 +320,10 @@ describe('StatsService', () => {
           loan: { currency: 'BOB' },
           installmentLinks: [
             {
-              amountApplied: '950',
-              installment: {
-                id: 'inst-settle',
-                interestAmount: '100',
-                paidAmount: '950',
-              },
+              interestPaid: '100',
+              capitalPaid: '850',
+              interestDiscounted: '50',
+              capitalDiscounted: '0',
             },
           ],
         },
