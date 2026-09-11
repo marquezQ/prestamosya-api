@@ -442,14 +442,51 @@ El script de inicialización realiza las siguientes operaciones en orden:
   ```bash
   pnpm exec prisma db seed
   ```
-- **Crear y aplicar migraciones**:
+- **Crear y aplicar migraciones en desarrollo**:
   ```bash
   pnpm exec prisma migrate dev --name <nombre_migracion>
   ```
-- **Sincronizar base de datos sin generar migración**:
+- **Sincronizar base de datos sin generar migración (Desarrollo local solamente)**:
   ```bash
   pnpm exec prisma db push
   ```
+
+---
+
+## Estrategia de Migraciones en Producción (CI/CD) y Resolución de Errores
+
+### `prisma db push` vs `prisma migrate deploy`
+
+> [!WARNING]
+> **Diferencia Crítica:** `pnpm exec prisma db push` modifica la estructura de la base de datos directamente **SIN registrar el historial en la tabla `_prisma_migrations`**.
+>
+> Por el contrario, los despliegues automáticos en servidor/VPS (`deploy.yml`) ejecutan `pnpm exec prisma migrate deploy`, el cual **requiere obligatoriamente** leer la tabla `_prisma_migrations` para saber qué scripts de migración faltan por aplicar.
+
+### Error P3005: `The database schema is not empty`
+
+Si en algún momento se ejecuta `prisma db push --force-reset` o se crea la base de datos manualmente sin ejecutar las migraciones oficiales, la base de datos contendrá tablas pero **carecerá de la tabla `_prisma_migrations`**.
+
+En el siguiente `git push` a `develop`, GitHub Actions fallará con el error:
+```text
+Error: P3005: The database schema is not empty.
+Read more about how to baseline an existing production database: https://pris.ly/d/migrate-baseline
+```
+
+### Solución SIN Pérdida de Datos (`baseline` de migraciones)
+
+Para solucionar el error P3005 en el VPS **preservando el 100% de los datos de clientes, préstamos y pagos ya registrados**, nunca se debe borrar la base de datos. En su lugar, se le indica a Prisma que marque las migraciones existentes como ya aplicadas (`--applied`):
+
+Ejecutar en la terminal del VPS (`/var/www/prestamosya/prestamosya-api`):
+```bash
+pnpm exec prisma migrate resolve --applied 20260615150807_init
+pnpm exec prisma migrate resolve --applied 20260818012602_add_fortnightly_period
+pnpm exec prisma migrate resolve --applied 20260827181308_timestamps_timestamptz
+pnpm exec prisma migrate resolve --applied 20260830153853_add_discount_amount_to_payments
+pnpm exec prisma migrate resolve --applied 20260831012844_add_schedule_type_to_loans
+pnpm exec prisma migrate resolve --applied 20260907224500_composite_client_id_number
+```
+
+**Resultado:** Prisma creará la tabla `_prisma_migrations`, registrará las migraciones en el historial sin tocar ninguna fila existente, y desbloqueará inmediatamente el CI/CD de GitHub Actions.
 
 ---
 

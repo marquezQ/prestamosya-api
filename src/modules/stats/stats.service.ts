@@ -221,6 +221,12 @@ export class StatsService {
                 id: true,
                 interestAmount: true,
                 paidAmount: true,
+                // Traer TODOS los links de pago de esta cuota (no anulados)
+                // para calcular el efectivo histórico real sin contaminar con descuentos.
+                paymentLinks: {
+                  where: { payment: { voided: false } },
+                  select: { amountApplied: true },
+                },
               },
             },
           },
@@ -256,14 +262,25 @@ export class StatsService {
         const installmentId = link.installment.id;
         const amountApplied = Number(link.amountApplied);
         const interestAmount = Number(link.installment.interestAmount);
-        const totalPaidInDB = Number(link.installment.paidAmount);
 
-        // paidBefore = lo que existía en BD antes del mes - lo que ya procesamos del mes
+        // Suma histórica de todo el efectivo aplicado a esta cuota (de todos los pagos no anulados).
+        // Usar esto en lugar de installment.paidAmount elimina la contaminación con discountApplied.
+        const totalCashPaidForInstallment = link.installment.paymentLinks
+          ? link.installment.paymentLinks.reduce(
+              (sum, pl) => sum + Number(pl.amountApplied),
+              0,
+            )
+          : Number(link.installment.paidAmount);
+
+        // paidBefore = efectivo acumulado históricamente menos lo ya procesado este mes
+        // y menos el amountApplied del link actual.
         const alreadyProcessedThisMonth =
           monthlyAppliedMap.get(installmentId) ?? 0;
         const paidBefore = Math.max(
           0,
-          totalPaidInDB - alreadyProcessedThisMonth - amountApplied,
+          totalCashPaidForInstallment -
+            alreadyProcessedThisMonth -
+            amountApplied,
         );
 
         const { toInterest, toCapital } = this._splitPayment(
@@ -323,14 +340,15 @@ export class StatsService {
         paidAmount: true,
         totalAmount: true,
         loan: { select: { currency: true } },
-        // Necesitamos la fecha del pago para determinar si fue a tiempo o tarde
+        // Traer todos los links para: (1) sumar amountApplied → actualRevenue correcto
+        // y (2) leer la fecha del primer pago → determinar paidOnTime vs paidLate.
         paymentLinks: {
           where: { payment: { voided: false } },
           select: {
+            amountApplied: true,
             payment: { select: { paymentDate: true } },
           },
           orderBy: { payment: { paymentDate: 'asc' } },
-          take: 1,
         },
       },
     });
@@ -346,15 +364,25 @@ export class StatsService {
     for (const inst of dueInstallments) {
       const currency = inst.loan.currency;
       const interestAmt = Number(inst.interestAmount);
-      const paidAmt = Number(inst.paidAmount);
 
       expectedRevenue[currency] = this._round(
         expectedRevenue[currency] + interestAmt,
       );
 
-      // Interés realmente cobrado de esta cuota (con priorización)
-      // paidBefore=0 porque calculamos sobre el total histórico de la cuota
-      const { toInterest } = this._splitPayment(paidAmt, interestAmt, 0);
+      // Interés realmente cobrado de esta cuota — usando solo efectivo real.
+      // SUM(paymentLinks.amountApplied) excluye el discountApplied, evitando
+      // que cuotas condonadas inflen el actualRevenue del mes.
+      const cashPaidForInstallment = inst.paymentLinks
+        ? inst.paymentLinks.reduce(
+            (sum, pl) => sum + Number(pl.amountApplied),
+            0,
+          )
+        : Number(inst.paidAmount);
+      const { toInterest } = this._splitPayment(
+        cashPaidForInstallment,
+        interestAmt,
+        0,
+      );
       actualRevenue[currency] = this._round(
         actualRevenue[currency] + toInterest,
       );

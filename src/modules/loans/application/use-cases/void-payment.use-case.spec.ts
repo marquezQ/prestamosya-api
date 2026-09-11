@@ -90,6 +90,7 @@ function createMockPaymentRecord(
     loanId: 'loan-1',
     registeredBy: 'user-1',
     amount: '500.00',
+    discountAmount: '0.00',
     paymentDate: new Date('2026-08-19'),
     method: 'cash',
     notes: 'Pago parcial',
@@ -98,8 +99,18 @@ function createMockPaymentRecord(
     voidReason: null,
     createdAt: new Date('2026-08-19'),
     installmentLinks: [
-      { id: 'link-1', installmentId: 'inst-1', amountApplied: '400.00' },
-      { id: 'link-2', installmentId: 'inst-2', amountApplied: '100.00' },
+      {
+        id: 'link-1',
+        installmentId: 'inst-1',
+        amountApplied: '400.00',
+        discountApplied: '0.00',
+      },
+      {
+        id: 'link-2',
+        installmentId: 'inst-2',
+        amountApplied: '100.00',
+        discountApplied: '0.00',
+      },
     ],
     ...overrides,
   };

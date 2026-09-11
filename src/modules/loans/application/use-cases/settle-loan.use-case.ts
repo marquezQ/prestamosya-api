@@ -164,14 +164,16 @@ export class SettleLoanUseCase {
       }
 
       // 2e. Persistir en la transacción
-      // Solo incluir en installmentLinks las cuotas con amountApplied > 0
-      // (el discount se registra en el Payment.discountAmount, no en payment_installments)
-      const installmentLinks = settledInstallments
-        .filter((s) => !s.amountApplied.isZero())
-        .map(({ installment, amountApplied }) => ({
+      // Se incluyen TODOS los settledInstallments (amountApplied y/o discountApplied).
+      // Antes se filtraban los de amountApplied=0, perdiendo el registro de cuotas
+      // cubiertas solo por condonación — lo que causaba bugs en stats y en void.
+      const installmentLinks = settledInstallments.map(
+        ({ installment, amountApplied, discountApplied }) => ({
           installmentId: installment.id!,
           amountApplied: amountApplied.toString(),
-        }));
+          discountApplied: discountApplied.toString(),
+        }),
+      );
 
       const paymentId = await repos.payments.create({
         loanId: loan.id!,

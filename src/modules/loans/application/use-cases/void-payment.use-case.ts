@@ -61,9 +61,9 @@ export class VoidPaymentUseCase {
         throw new NotFoundException('Loan not found');
       }
 
-      const paymentAmount = Money.of(payment.amount, loan.currency);
-
-      // 4. Revertir cada cuota vinculada al pago
+      // 4. Revertir cada cuota vinculada al pago.
+      //    Se revierte amountApplied + discountApplied porque ambos suman
+      //    al paidAmount de la cuota y deben restaurarse completamente.
       const updatedInstallments: InstallmentEntity[] = [];
 
       for (const link of payment.installmentLinks) {
@@ -72,14 +72,23 @@ export class VoidPaymentUseCase {
         );
 
         if (installment) {
-          const amountApplied = Money.of(link.amountApplied, loan.currency);
-          installment.revertPayment(amountApplied);
+          const totalApplied = Money.of(
+            Number(link.amountApplied) + Number(link.discountApplied),
+            loan.currency,
+          );
+          installment.revertPayment(totalApplied);
           updatedInstallments.push(installment);
         }
       }
 
-      // 5. Revertir el estado y saldo del préstamo
-      loan.revertPayment(paymentAmount);
+      // 5. Revertir el estado y saldo del préstamo.
+      //    Se usa amount + discountAmount para restaurar outstandingBalance al valor
+      //    original antes del settle (el settle reduce el balance por ambos conceptos).
+      const totalReverted = Money.of(
+        Number(payment.amount) + Number(payment.discountAmount),
+        loan.currency,
+      );
+      loan.revertPayment(totalReverted);
 
       // 6. Persistir todo en la transacción
       await repos.payments.markVoided(paymentId, reason);
