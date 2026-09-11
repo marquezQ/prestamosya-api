@@ -32,6 +32,7 @@ jobs:
             pnpm install --frozen-lockfile
 
             echo "========== Migraciones Prisma =========="
+            pnpm exec prisma migrate resolve --rolled-back 20260911032000_backfill_historical_payment_installments || true
             pnpm exec prisma migrate deploy
             pnpm exec prisma generate
 
