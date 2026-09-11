@@ -37,6 +37,7 @@ export class PrismaPaymentRepository extends PaymentRepository {
           create: data.installmentLinks.map((link) => ({
             installmentId: link.installmentId,
             amountApplied: link.amountApplied,
+            discountApplied: link.discountApplied ?? '0.00',
           })),
         },
       },
@@ -59,6 +60,7 @@ export class PrismaPaymentRepository extends PaymentRepository {
             id: true,
             installmentId: true,
             amountApplied: true,
+            discountApplied: true,
           },
         },
       },
@@ -70,7 +72,8 @@ export class PrismaPaymentRepository extends PaymentRepository {
       id: raw.id,
       loanId: raw.loanId,
       registeredBy: raw.registeredBy,
-      amount: raw.amount.toString(),
+      amount: String(raw.amount),
+      discountAmount: String(raw.discountAmount),
       paymentDate: raw.paymentDate,
       method: raw.method,
       notes: raw.notes,
@@ -81,7 +84,8 @@ export class PrismaPaymentRepository extends PaymentRepository {
       installmentLinks: raw.installmentLinks.map((link) => ({
         id: link.id,
         installmentId: link.installmentId,
-        amountApplied: link.amountApplied.toString(),
+        amountApplied: String(link.amountApplied),
+        discountApplied: String(link.discountApplied),
       })),
     };
   }

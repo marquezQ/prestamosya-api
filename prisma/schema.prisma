@@ -207,12 +207,13 @@ model Payment {
 }
 
 model PaymentInstallment {
-  id            String      @id @default(uuid())
-  paymentId     String      @map("payment_id")
-  installmentId String      @map("installment_id")
-  amountApplied Decimal     @map("amount_applied") @db.Decimal(12, 2)
-  installment   Installment @relation(fields: [installmentId], references: [id])
-  payment       Payment     @relation(fields: [paymentId], references: [id])
+  id              String      @id @default(uuid())
+  paymentId       String      @map("payment_id")
+  installmentId   String      @map("installment_id")
+  amountApplied   Decimal     @map("amount_applied")   @db.Decimal(12, 2)
+  discountApplied Decimal     @default(0) @map("discount_applied") @db.Decimal(12, 2)
+  installment     Installment @relation(fields: [installmentId], references: [id])
+  payment         Payment     @relation(fields: [paymentId], references: [id])
 
   @@index([paymentId])
   @@index([installmentId])

@@ -183,8 +183,16 @@ describe('RegisterPaymentUseCase', () => {
       method: 'cash',
       notes: 'Pago parcial cuota 2',
       installmentLinks: [
-        { installmentId: 'inst-1', amountApplied: '400.00' },
-        { installmentId: 'inst-2', amountApplied: '100.00' },
+        {
+          installmentId: 'inst-1',
+          amountApplied: '400.00',
+          discountApplied: '0.00',
+        },
+        {
+          installmentId: 'inst-2',
+          amountApplied: '100.00',
+          discountApplied: '0.00',
+        },
       ],
     });
 

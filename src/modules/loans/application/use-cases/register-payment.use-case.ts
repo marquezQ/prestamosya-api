@@ -140,6 +140,7 @@ export class RegisterPaymentUseCase {
           ({ installment, applied }) => ({
             installmentId: installment.id!,
             amountApplied: applied.toString(),
+            discountApplied: '0.00',
           }),
         ),
       });
