@@ -151,7 +151,7 @@ model LoanGuarantee {
   createdAt   DateTime            @default(now()) @db.Timestamptz(3) @map("created_at")
   releasedAt  DateTime?           @db.Timestamptz(3) @map("released_at")
   guarantee   Guarantee           @relation(fields: [guaranteeId], references: [id])
-  loan        Loan                @relation(fields: [loanId], references: [id])
+  loan        Loan                @relation(fields: [loanId], references: [id], onDelete: Cascade)
 
   @@index([loanId])
   @@index([guaranteeId])
@@ -173,7 +173,7 @@ model Installment {
   archived          Boolean              @default(false)
   createdAt         DateTime             @default(now()) @db.Timestamptz(3) @map("created_at")
   updatedAt         DateTime             @updatedAt @db.Timestamptz(3) @map("updated_at")
-  loan              Loan                 @relation(fields: [loanId], references: [id])
+  loan              Loan                 @relation(fields: [loanId], references: [id], onDelete: Cascade)
   paymentLinks      PaymentInstallment[]
 
   @@index([loanId])
@@ -197,7 +197,7 @@ model Payment {
   voidReason       String?              @map("void_reason")
   createdAt        DateTime             @default(now()) @db.Timestamptz(3) @map("created_at")
   installmentLinks PaymentInstallment[]
-  loan             Loan                 @relation(fields: [loanId], references: [id])
+  loan             Loan                 @relation(fields: [loanId], references: [id], onDelete: Cascade)
   registrar        User                 @relation(fields: [registeredBy], references: [id])
 
   @@index([loanId])
@@ -214,8 +214,8 @@ model PaymentInstallment {
   capitalPaid        Decimal     @default(0) @map("capital_paid")        @db.Decimal(12, 2)
   interestDiscounted Decimal     @default(0) @map("interest_discounted") @db.Decimal(12, 2)
   capitalDiscounted  Decimal     @default(0) @map("capital_discounted")  @db.Decimal(12, 2)
-  installment        Installment @relation(fields: [installmentId], references: [id])
-  payment            Payment     @relation(fields: [paymentId], references: [id])
+  installment        Installment @relation(fields: [installmentId], references: [id], onDelete: Cascade)
+  payment            Payment     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 
   @@index([paymentId])
   @@index([installmentId])
@@ -236,7 +236,7 @@ model LoanRefinance {
   newTotalAmount       Decimal       @map("new_total_amount") @db.Decimal(12, 2)
   notes                String?
   createdAt            DateTime      @default(now()) @db.Timestamptz(3) @map("created_at")
-  loan                 Loan          @relation(fields: [loanId], references: [id])
+  loan                 Loan          @relation(fields: [loanId], references: [id], onDelete: Cascade)
 
   @@index([loanId])
   @@map("loan_refinances")
