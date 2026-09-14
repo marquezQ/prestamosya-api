@@ -77,7 +77,7 @@ La primera etapa de construcción estableció los cimientos y el flujo completo 
 - El cliente se marca `CURRENT` al crear su primer préstamo si estaba `NO_LOAN` (ver `create-loan.use-case.ts`).
 
 ### Testing de esta etapa
-- Se implementaron **94 tests unitarios aislados** (`11 test suites` en verde) verificando exhaustivamente: las lógicas de redondeo, sumas de `Money`, vinculación de garantías con chequeo de estado `IN_USE`, y generación de respuestas de detalle.
+- Se implementaron **147 tests unitarios aislados** (`17 test suites` en verde) verificando exhaustivamente: las lógicas de redondeo, sumas de `Money`, vinculación de garantías con chequeo de estado `IN_USE`, generación de respuestas de detalle, flujos de pago, liquidación anticipada, cron de mora y dashboard de pagos.
 
 ---
 
@@ -85,7 +85,7 @@ La primera etapa de construcción estableció los cimientos y el flujo completo 
 
 Las siguientes fases deben desarrollarse para dar por concluido completamente el módulo financiero.
 
-### Fase 8: Flujos de Pago (Payment integration)
+### Fase 8: Flujos de Pago (Payment integration) ✅ IMPLEMENTADO
 - **`PaymentRepository` & `PrismaPaymentRepository`**: Abstracción e infraestructura para persistir pagos (`payments`) y enlaces a cuotas (`payment_installments`).
 - **`UnitOfWork` extendido**: Transaccionalidad atómica asegurada entre `loans`, `installments` y `payments`.
 - **`RegisterPaymentUseCase`**: Distribución automática de montos en orden FIFO (`dueDate ASC`) entre cuotas pendientes usando el patrón surplus de `InstallmentEntity.applyPayment()`. Manejo de pagos parciales (`PARTIAL`), totales (`PAID`) y finalización del préstamo (`COMPLETED`).
@@ -93,29 +93,29 @@ Las siguientes fases deben desarrollarse para dar por concluido completamente el
 - **`GetPaymentDashboardUseCase`**: Consulta de dashboard agrupada en 3 secciones: `dueToday`, `overdue` y `paidToday`.
 - **`PaymentsModule`**: Módulo e infraestructura HTTP (`POST /api/payments`, `DELETE /api/payments/:id`, `GET /api/payments/dashboard`) desacoplada con controladores y DTOs validados.
 
-### Fase 10: Cron Job de Mora y Recálculo Manual
+### Fase 8b: Liquidación Anticipada con Condonación de Interés (`SettleLoanUseCase`) ✅ IMPLEMENTADO
+- **`POST /api/payments/settle`**: Cierra un préstamo antes de su vencimiento aceptando dinero físico real (`amount`) e interés condonado (`discount`).
+- **Invariante Crítico**: `LoanEntity.totalAmount` es `readonly` e inmutable. El contrato original no cambia, permitiendo mantener estadísticas exactas. `discount` se guarda en `payment.discountAmount`.
+- **Regla Dominio**: `amount + discount` debe ser **exactamente igual** al `outstandingBalance`. El préstamo pasa a `COMPLETED`.
+
+### Fase 10: Cron Job de Mora y Recálculo Manual ✅ IMPLEMENTADO
 - **`OverdueProcessorService`**: Servicio centralizado que calcula de forma idempotente las cuotas vencidas (`dueDate < hoy - graceDays`), actualiza `daysOverdue`, pasa cuotas sin pagar a `OVERDUE`, y conmuta el estado de los clientes entre `CURRENT` y `DELINQUENT`.
 - **`OverdueCron`**: Tarea programada `@nestjs/schedule` con `@Cron('0 6 * * *', { timeZone: 'America/La_Paz' })` ejecutada automáticamente todos los días a las 6:00 AM.
 - **`CronController` (`POST /api/admin/recalculate-overdue`)**: Endpoint de respaldo administrativo para forzar la actualización síncrona en cualquier momento.
 - **Zona Horaria Global**: Proceso Node configurado con `process.env.TZ = 'America/La_Paz'` en `main.ts` y utilidades de fecha en `src/common/utils/date.utils.ts`.
 
-### Fase 8b: Liquidación Anticipada con Condonación de Interés (`SettleLoanUseCase`)
-- **`POST /api/payments/settle`**: Cierra un préstamo antes de su vencimiento aceptando dinero físico real (`amount`) e interés condonado (`discount`).
-- **Invariante Crítico**: `LoanEntity.totalAmount` es `readonly` e inmutable. El contrato original no cambia, permitiendo mantener estadísticas exactas. `discount` se guarda en `payment.discountAmount`.
-- **Regla Dominio**: `amount + discount` debe ser **exactamente igual** al `outstandingBalance`. El préstamo pasa a `COMPLETED`.
-
-### Fase 7c: Modalidad de Cronograma `LoanScheduleType` (`INTEREST_ONLY`)
+### Fase 7c: Modalidad de Cronograma `LoanScheduleType` (`INTEREST_ONLY`) ✅ IMPLEMENTADO
 - **`LoanScheduleType`**: Enum en dominio y BD (`EQUAL_INSTALLMENTS` | `INTEREST_ONLY`).
 - **`EQUAL_INSTALLMENTS` (Default)**: Amortización estándar con capital + interés distribuido en cada cuota.
 - **`INTEREST_ONLY` (Nuevo - Modelo Balloon)**: Cuotas 1 a N-1 cobran únicamente el interés generado en cada período (`capitalAmount = 0`); la última cuota (N) cobra el interés del período más el **capital completo** prestado (`capitalAmount = capital`).
 - **Simulación y Creación**: Soporte completo en `POST /api/loans/simulate` y `POST /api/loans` pasando `scheduleType: 'INTEREST_ONLY'`. Es opcional; si se omite, asume `EQUAL_INSTALLMENTS` para retrocompatibilidad total.
 
 ### Testing del Módulo
-- Se cuenta con **125 tests unitarios aislados** (`15 test suites` en verde) verificando recálculo diario, idempotencia, estados de cliente, flujo de mora, liquidación anticipada y cálculo de cronogramas `INTEREST_ONLY`.
+- Se cuenta con **147 tests unitarios aislados** (`17 test suites` en verde) verificando recálculo diario, idempotencia, estados de cliente, flujo de mora, liquidación anticipada, cálculo de cronogramas `INTEREST_ONLY` y dashboard de pagos.
 
 ---
 
-## Fases Pendientes (Roadmap Futuro)
+## Fase Pendiente (Roadmap Futuro)
 
 ### Fase 9: Refinanciamiento (Simulación y Ejecución)
 - **Caso de uso (`CalculateRefinanceUseCase`)**: Tomar el saldo deudor actual (`outstandingBalance`), sumar capital adicional solicitado, calcular nuevo interés y simular las nuevas cuotas sin tocar la base de datos.

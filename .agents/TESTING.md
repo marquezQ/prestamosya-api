@@ -88,7 +88,7 @@ Reglas de la reorganización:
 
 ---
 
-## 4. Estrategia por módulo (estado actual: auth, clients, loans, guarantees)
+## 4. Estrategia por módulo (estado actual: auth, clients, loans, guarantees, payments, dashboard, stats, cron)
 
 ### Módulo `auth`
 | Unidad | Tipo | Prioridad | Qué cubrir |
@@ -119,6 +119,30 @@ Reglas de la reorganización:
 | `LoanEntity` & `InstallmentEntity` | **Unit** | 🔴 **Alta** | Invariantes puros del negocio: instanciación de cuotas, cálculos de pagos, transiciones de estado, validación de refinanciamiento. |
 | `CreateLoanUseCase` | **Unit** | 🟡 Media-Alta | Validaciones de creación, llamadas a los servicios de dominio, manejo de transacciones vía `UnitOfWork`. |
 | `LoansController` & Repositories | — | ⛔ no | Probados directamente a través de tests E2E y de integración. |
+
+### Módulo `payments` (usa use-cases de loans)
+| Unidad | Tipo | Prioridad | Qué cubrir |
+|--------|------|-----------|-----------|
+| `RegisterPaymentUseCase` | **Unit** | 🔴 **Alta** | Distribución FIFO, pagos parciales, multi-cuota, validación de saldo, `PENDING` → `PARTIAL`/`PAID`, actualización `outstandingBalance`. |
+| `VoidPaymentUseCase` | **Unit** | 🔴 **Alta** | Reversión correcta de cuotas, `PARTIAL`/`PAID` → anterior, `COMPLETED` → `ACTIVE` si aplica. |
+| `SettleLoanUseCase` | **Unit** | 🔴 **Alta** | Invariante `amount + discount = outstandingBalance`, loan → `COMPLETED`, `discount` guardado en `payment.discountAmount`. |
+| `GetPaymentDashboardUseCase` | **Unit** | 🟡 Media | `dueToday`, `overdue`, `paidToday` agrupados correctamente, fechas de zona horaria `America/La_Paz`. |
+| `PaymentsController` | — | ⛔ no | Pura delegación a use-cases de loans. |
+
+### Módulo `dashboard`
+| Unidad | Tipo | Prioridad | Qué cubrir |
+|--------|------|-----------|-----------|
+| `GetHomeDashboardUseCase` | **Unit** | 🔴 **Alta** | `capitalEnCalle` (BOB/USD separados), `loansSummary` (delinquencyRate), `clientsSummary`, `overdueInstallments` priorizados por daysOverdue. |
+
+### Módulo `stats`
+| Unidad | Tipo | Prioridad | Qué cubrir |
+|--------|------|-----------|-----------|
+| `StatsService` | **Unit** | 🟡 Media | `getMonthlyStats` (5 secciones), `getMonthlyHistory` (array cronológico), multi-moneda sin mezcla, `interestCollected` como ganancia real. |
+
+### Módulo `cron`
+| Unidad | Tipo | Prioridad | Qué cubrir |
+|--------|------|-----------|-----------|
+| `OverdueProcessorService` | **Unit** | 🔴 **Alta** | Cálculo de `daysOverdue`, marca `OVERDUE` respetando `graceDays`, sincronización `CURRENT`↔`DELINQUENT`, idempotencia. |
 
 ---
 
@@ -177,10 +201,21 @@ const prismaMock = {
 ## 7. Convenciones de archivos y ejecución
 
 ```
-src/modules/auth/auth.service.spec.ts        (unit)
-src/modules/clients/clients.service.spec.ts  (unit)
-test/auth.e2e-spec.ts                         (e2e)
-test/clients.e2e-spec.ts                      (e2e)
+src/modules/auth/auth.service.spec.ts              (unit)
+src/modules/auth/strategies/jwt.strategy.spec.ts   (unit)
+src/modules/clients/clients.service.spec.ts        (unit)
+src/modules/loans/domain/**/*.spec.ts              (unit - dominio)
+src/modules/loans/application/**/*.spec.ts         (unit - use cases)
+src/modules/payments/**/*.spec.ts                  (unit - si hubiera)
+src/modules/guarantees/guarantees.service.spec.ts  (unit)
+src/modules/dashboard/**/*.spec.ts                 (unit)
+src/modules/stats/stats.service.spec.ts            (unit)
+src/modules/cron/services/overdue-processor.service.spec.ts (unit)
+test/auth.e2e-spec.ts                              (e2e)
+test/clients.e2e-spec.ts                           (e2e)
+test/loans.e2e-spec.ts                             (e2e)
+test/guarantees.e2e-spec.ts                        (e2e)
+test/stats.e2e-spec.ts                             (e2e)
 ```
 
 - **Unit:** `describe('AuthService')` / `describe('ClientsService')`, un `spec` por clase, `beforeEach` de reset mocks, `it` que describe el **invariante** o el caso borde.
@@ -209,9 +244,9 @@ test/clients.e2e-spec.ts                      (e2e)
 
 ---
 
-## 9. Estado de implementación (Ejecutado: auth, clients, loans, guarantees)
+## 9. Estado de implementación (Ejecutado: auth, clients, loans, guarantees, dashboard, stats, cron)
 
-Unit y E2E de `auth`, `clients`, `loans` y `guarantees` implementados y en verde. Testing unitario completo del dominio y casos de uso del módulo `loans` (Clean Architecture). El E2E de `loans` cubre la creación automática/manual, simulación, detalle y cuotas; el de `guarantees` cubre el CRUD y el ciclo AVAILABLE → IN_USE → AVAILABLE al vincular a un préstamo.
+Unit y E2E de `auth`, `clients`, `loans` y `guarantees` implementados y en verde. Tests unitarios del dominio y casos de uso del módulo `loans` (Clean Architecture). Tests unitarios de `dashboard`, `stats` y `cron`. El E2E de `loans` cubre la creación automática/manual, simulación, detalle y cuotas; el de `guarantees` cubre el CRUD y el ciclo AVAILABLE → IN_USE → AVAILABLE al vincular a un préstamo.
 
 | Id | Qué | Archivos | Estado |
 |----|-----|----------|--------|
@@ -226,9 +261,12 @@ Unit y E2E de `auth`, `clients`, `loans` y `guarantees` implementados y en verde
 | 9 | Unit Use Cases `loans`| `src/modules/loans/application/**/*.spec.ts`| ✅ |
 | 10 | E2E `loans` | `test/loans.e2e-spec.ts` | ✅ |
 | 11 | E2E `guarantees` | `test/guarantees.e2e-spec.ts` | ✅ |
-| 12| Verificación general | — | ✅ |
+| 12 | Unit `dashboard` (GetHomeDashboardUseCase) | `src/modules/dashboard/**/*.spec.ts` | ✅ |
+| 13 | Unit `stats` (StatsService) | `src/modules/stats/stats.service.spec.ts` | ✅ |
+| 14 | Unit `cron` (OverdueProcessorService) | `src/modules/cron/services/overdue-processor.service.spec.ts` | ✅ |
+| 15 | Verificación general | — | ✅ |
 
-**Resultado:** `106` tests unit + `48` tests E2E en verde. Cobertura del dominio de `loans` cercana al 100%.
+**Resultado:** `147` tests unit + `48` tests E2E en verde (17 spec files). Cobertura del dominio de `loans` cercana al 100%.
 
 ---
 
@@ -318,9 +356,9 @@ El orden prioriza probar el costo de cada técnica en su momento y ver la utilid
 ---
 
 ## 10. Fuera del alcance (para más adelante)
-- **Unit/Integración de `payments`** (pago completo, parcial, multi-cuota, anulación) — cuando exista el módulo.
-- **Unit del cron de mora** — cuando exista el `overdue.cron.ts` (`@nestjs/schedule`).
-- **Integración del `PrismaLoanRepository`** contra BD real.
+- **Unit del refinanciamiento** (`RefinanceLoanUseCase`) — cuando se implemente la Fase 9.
+- **Integración del `PrismaLoanRepository`** contra BD real (test de integración).
+- **Reorganización de E2E por flujos de usuario** — consolidar en `loan-lifecycle.e2e-spec.ts` al final del proyecto.
 
 ---
 

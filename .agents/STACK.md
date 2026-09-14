@@ -11,7 +11,7 @@ Stack tecnológico, infraestructura, variables de entorno y decisiones técnicas
 | Framework | NestJS |
 | ORM | Prisma |
 | Base de datos | PostgreSQL 16 |
-| Autenticación | JWT + Refresh Tokens |
+| Autenticación | JWT (access token, 7 días por defecto) |
 | Almacenamiento de archivos | Cloudinary — imágenes de garantías. Optimizadas a WebP (max 1200px, quality 80) con `sharp` antes de subir. Carpeta: `{user.name}/garantias/` (nombre completo del usuario, no username) |
 | Tareas programadas | @nestjs/schedule |
 | Validación | class-validator + class-transformer |
@@ -30,9 +30,7 @@ DATABASE_URL=postgresql://user:password@localhost:5432/prestamosya
 
 # JWT
 JWT_SECRET=cadena_aleatoria_muy_larga_minimo_64_caracteres
-JWT_EXPIRES_IN=15m
-JWT_REFRESH_SECRET=otra_cadena_aleatoria_diferente
-JWT_REFRESH_EXPIRES_IN=30d
+JWT_EXPIRES_IN=7d
 
 # App
 PORT=3000
@@ -131,7 +129,7 @@ pnpm run build
 | Arquitectura estándar NestJS en el resto | Clean Architecture global | Velocidad de desarrollo, menos archivos, suficiente para la complejidad real |
 | Prisma sobre TypeORM | TypeORM | Schema como fuente de verdad, generación automática de tipos, migraciones más simples |
 | PostgreSQL sobre MongoDB | MongoDB | Datos financieros requieren ACID y relaciones. Los datos son relacionales por naturaleza |
-| JWT + Refresh Tokens | Solo JWT | Sesión persistente sin comprometer seguridad. Refresh tokens revocables en BD |
+| JWT simple (access token 7d) | JWT + Refresh Tokens | Por ahora un solo token de 7 días simplifica el flujo. Refresh tokens se evalúan si se necesita sesión más segura a futuro |
 | Sin Docker en producción | Docker Compose | VPS con recursos limitados — PostgreSQL nativo + PM2 es más eficiente |
 | Redis no incluido | Redis para cache | No necesario para el volumen del MVP. Se evalúa en Fase 2 si el dashboard es lento |
 | Garantías al cliente | Garantías al préstamo | Un cliente puede tener múltiples bienes. Se reutilizan entre préstamos |
@@ -140,10 +138,10 @@ pnpm run build
 
 ## Decisiones pendientes
 
-| Decisión | Opciones en evaluación | Bloqueado hasta |
-|----------|----------------------|-----------------|
-| Almacenamiento de archivos | Cloudinary, ImageKit, u otro freemium | **DECIDIDO: Cloudinary** |
-| Framework de testing | Por definir | Antes de escribir el primer test |
+| Decisión | Opciones en evaluación | Estado |
+|----------|----------------------|--------|
+| Almacenamiento de archivos | Cloudinary, ImageKit | **DECIDIDO: Cloudinary** ✅ |
+| Framework de testing | Jest, Vitest | **DECIDIDO: Jest** ✅ |
 | Clean Architecture en payments | Aplicar parcialmente | Si la complejidad del módulo lo requiere a futuro |
 
 ---
@@ -153,9 +151,9 @@ pnpm run build
 El proyecto se gestiona en Linear bajo el proyecto **PrestApp — App de Préstamos**.
 Cada rama de git debe corresponder a un ticket: `feature/PED-XX-descripcion-breve`
 
-Sprint 0 activo (hasta 16 jun):
-- PED-5 — Schema Prisma ← DONE
-- PED-7 — Inicializar repo NestJS
-- PED-9 — Migraciones y seed ← DONE
-- PED-6 — Setup VPS
-- PED-10 — Configurar VPS
+Sprint 0 completado:
+- PED-5 — Schema Prisma ✅
+- PED-7 — Inicializar repo NestJS ✅
+- PED-9 — Migraciones y seed ✅
+- PED-6 — Setup VPS ✅
+- PED-10 — Configurar VPS ✅

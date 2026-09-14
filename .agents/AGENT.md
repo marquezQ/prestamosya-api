@@ -41,7 +41,7 @@ Este repositorio es exclusivamente el backend. El frontend vive en `prestamosya-
 
 6. **Cloudinary** es el proveedor de almacenamiento de imágenes. `CloudinaryService` en `src/common/cloudinary/` — inyectable globalmente. Las imágenes se optimizan con `sharp` (WebP, max 1200px, quality 80) antes de subir. Carpeta en Cloudinary: `{user.name}/garantias/` (usando el nombre completo del usuario, no el username). Ver `STACK.md`.
 
-7. **No implementar tests** hasta que se decida el framework. Ver `TESTING.md`.
+7. **Tests unitarios y E2E ya implementados** — Jest como framework (147 unit tests, 5 suites E2E, 17 spec files). Ver `TESTING.md`.
 
 8. **Nunca devolver `passwordHash`** en ninguna respuesta de la API.
 

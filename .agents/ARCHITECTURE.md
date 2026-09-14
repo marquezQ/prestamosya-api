@@ -13,20 +13,28 @@ src/
       auth.module.ts
       auth.controller.ts
       auth.service.ts
+      auth.service.spec.ts
+      auth.docs.ts
+      decorators/
+        current-user.decorator.ts
+        public.decorator.ts
+      dto/
+        auth-response.dto.ts
+        login.dto.ts
+      guards/
+        jwt-auth.guard.ts
+      interfaces/
+        jwt-payload.interface.ts
       strategies/
         jwt.strategy.ts
-        jwt-refresh.strategy.ts
-      guards/
-        jwt.guard.ts
-        roles.guard.ts
-      dto/
-        login.dto.ts
-        refresh-token.dto.ts
+        jwt.strategy.spec.ts
 
     clients/                       ← estándar NestJS
       clients.module.ts
       clients.controller.ts
       clients.service.ts
+      clients.service.spec.ts
+      clients.docs.ts
       dto/
         create-client.dto.ts
         update-client.dto.ts
@@ -34,52 +42,96 @@ src/
 
     loans/                         ← Clean Architecture
       loans.module.ts
+      loans.docs.ts
       domain/
         entities/
-          loan.entity.ts           ← clase Loan con métodos de negocio puros
-          installment.entity.ts    ← clase Installment con lógica de estado
+          loan.entity.ts
+          loan.entity.spec.ts
+          installment.entity.ts
+          installment.entity.spec.ts
+        enums/
+          index.ts
+          installment-status.enum.ts
+          loan-mode.enum.ts
+          loan-schedule-type.enum.ts
+          loan-status.enum.ts
+          period-type.enum.ts
+        errors/
+          loan-domain.errors.ts
         repositories/
-          loan.repository.ts       ← interfaz (contrato) — solo TypeScript, sin Prisma
+          installment.repository.ts
+          loan.repository.ts
+          payment.repository.ts
         services/
-          loan-calculator.service.ts  ← cálculo de cuotas, redondeo — solo TypeScript
+          loan-calculator.service.ts
+          loan-calculator.service.spec.ts
+        value-objects/
+          money.vo.ts
+          money.vo.spec.ts
       application/
+        ports/
+          unit-of-work.port.ts
         use-cases/
           create-loan.use-case.ts
-          calculate-installments.use-case.ts
-          refinance-loan.use-case.ts
+          create-loan.use-case.spec.ts
+          simulate-loan.use-case.ts
+          get-loan-detail.use-case.ts
+          register-payment.use-case.ts
+          register-payment.use-case.spec.ts
+          void-payment.use-case.ts
+          void-payment.use-case.spec.ts
+          settle-loan.use-case.ts
+          settle-loan.use-case.spec.ts
+          link-guarantee.use-case.ts
+          link-guarantee.use-case.spec.ts
+          unlink-guarantee.use-case.ts
+          get-payment-dashboard.use-case.ts
       infrastructure/
-        prisma-loan.repository.ts  ← implementa loan.repository.ts usando Prisma
-        loans.controller.ts        ← recibe HTTP, llama a los use-cases
+        loans.controller.ts
+        prisma-unit-of-work.ts
+        mappers/
+          installment.mapper.ts
+          loan.mapper.ts
+        repositories/
+          prisma-installment.repository.ts
+          prisma-loan.repository.ts
+          prisma-payment.repository.ts
       dto/
         create-loan.dto.ts
-        refinance-loan.dto.ts
+        simulate-loan.dto.ts
+        link-guarantee.dto.ts
+        loan-detail-response.dto.ts
         loan-response.dto.ts
 
-    installments/                  ← estándar NestJS
-      installments.module.ts
-      installments.controller.ts
-      installments.service.ts
+    payments/                      ← estándar NestJS (sin service propio)
+      payments.module.ts
+      payments.controller.ts
+      payments.docs.ts
       dto/
-
-    payments/                      ← estándar NestJS por ahora
-      payments.module.ts           ← puede migrar parcialmente a Clean Architecture
-      payments.controller.ts       ← si la complejidad lo requiere a futuro
-      payments.service.ts
-      dto/
+        register-payment.dto.ts
+        void-payment.dto.ts
+        settle-loan.dto.ts
+        query-payment-dashboard.dto.ts
 
     guarantees/                    ← estándar NestJS
       guarantees.module.ts
       guarantees.controller.ts
       guarantees.service.ts
+      guarantees.service.spec.ts
+      guarantees.docs.ts
       dto/
+        create-guarantee.dto.ts
+        update-guarantee.dto.ts
+        guarantee-response.dto.ts
 
-    dashboard/                     ← estándar NestJS
+    dashboard/                     ← estándar NestJS + use-case
       dashboard.module.ts
       dashboard.controller.ts
       dashboard.docs.ts
       application/
         use-cases/
           get-home-dashboard.use-case.ts
+          get-home-dashboard.use-case.spec.ts
       dto/
         home-dashboard-response.dto.ts
 
@@ -87,41 +139,75 @@ src/
       stats.module.ts
       stats.controller.ts
       stats.service.ts
+      stats.service.spec.ts
+      stats.docs.ts
+      dto/
+        monthly-stats-response.dto.ts
+        monthly-history-response.dto.ts
+        query-monthly-stats.dto.ts
+        query-monthly-history.dto.ts
 
-    config/                        ← estándar NestJS
-      config.module.ts
-      config.controller.ts
-      config.service.ts
-
-    cron/                          ← estándar NestJS
+    cron/                          ← estándar NestJS + @nestjs/schedule
       cron.module.ts
+      cron.controller.ts
+      cron.docs.ts
       overdue.cron.ts
+      services/
+        overdue-processor.service.ts
+        overdue-processor.service.spec.ts
 
   common/
-    decorators/
-      current-user.decorator.ts
-      roles.decorator.ts
-    filters/
-      http-exception.filter.ts
-    interceptors/
-      response.interceptor.ts
-    guards/
+    cloudinary/                    ← @Global(), inyectable en cualquier módulo
+      cloudinary.module.ts
+      cloudinary.service.ts
+    types/
+      prisma.types.ts              ← PrismaClientLike / PrismaTransactionClient
+    utils/
+      date.utils.ts                ← getTodayLaPaz, subDays, calculateDaysOverdue
 
   prisma/
-    prisma.module.ts
+    prisma.module.ts               ← @Global()
     prisma.service.ts
+
+  testing/
+    prisma.mock.ts                 ← createPrismaMock, prismaServiceOf, lastCallArg
+
+  generated/
+    prisma/                        ← gitignored, generado por Prisma v7
 
   main.ts
   app.module.ts
+  app.controller.ts
+  app.service.ts
 ```
+
+---
+
+## Módulos globales
+
+- **`PrismaModule`** (`src/prisma/prisma.module.ts`): `@Global()` — `PrismaService` inyectable en todos los módulos sin importarlo explícitamente.
+- **`CloudinaryModule`** (`src/common/cloudinary/cloudinary.module.ts`): `@Global()` — `CloudinaryService` inyectable en cualquier módulo. Sube y optimiza imágenes de garantías a Cloudinary.
+
+---
+
+## Registro global de guardia — `AppModule`
+
+```typescript
+{
+  provide: APP_GUARD,
+  useClass: JwtAuthGuard,  // Todas las rutas protegidas por defecto
+}
+```
+
+Todas las rutas requieren JWT excepto las marcadas con `@Public()` (actualmente solo `POST /api/auth/login`).
 
 ---
 
 ## Arquitectura estándar NestJS (todos los módulos excepto loans)
 
 ```
-module.ts       ← importa e exporta
-controller.ts   ← recibe request, valida con DTOs, llama al service
+module.ts       ← importa y exporta
+controller.ts   ← recibe request, valida con DTOs, llama al service/use-case
 service.ts      ← lógica de negocio, accede a Prisma directamente
 dto/            ← un archivo por DTO (create, update, response, query)
 ```
@@ -129,22 +215,9 @@ dto/            ← un archivo por DTO (create, update, response, query)
 **Regla:** El controller **no contiene lógica de negocio**. Solo recibe, valida y delega.
 El service **no conoce Request ni Response** de HTTP. Solo recibe parámetros tipados.
 
-```typescript
-// clients.service.ts — accede a Prisma directamente, sin repositorio intermedio
-@Injectable()
-export class ClientsService {
-  constructor(private readonly prisma: PrismaService) {}
+### Excepción: módulo `payments`
 
-  async findAll(params: ClientsQueryDto) {
-    return this.prisma.client.findMany({
-      where: {
-        deletedAt: null,
-        status: params.status,
-      },
-    });
-  }
-}
-```
+`payments` **no tiene service propio**. El `PaymentsController` importa y llama directamente los use-cases exportados desde `LoansModule` (`RegisterPaymentUseCase`, `VoidPaymentUseCase`, `SettleLoanUseCase`, `GetPaymentDashboardUseCase`). El módulo es solo un contenedor HTTP que delega toda la lógica al módulo financiero.
 
 ---
 
@@ -152,154 +225,140 @@ export class ClientsService {
 
 ### Por qué solo en loans
 
-`loans` contiene la lógica más compleja y crítica del sistema: cálculo de cuotas, manejo de redondeo financiero, generación de cronogramas y refinanciamiento. Esta lógica tiene que ser testeable de forma completamente aislada, sin base de datos, sin NestJS, con TypeScript puro. Los demás módulos son CRUD con algo de validación — Clean Architecture sería sobreingeniería innecesaria.
-
-**Regla crítica:** No aplicar Clean Architecture en ningún otro módulo a menos que se decida explícitamente. `auth`, `clients`, `payments`, `dashboard`, `stats`, `config` y `cron` usan arquitectura estándar.
+`loans` contiene la lógica más compleja y crítica del sistema: cálculo de cuotas, manejo de redondeo financiero, generación de cronogramas, pagos FIFO, liquidación anticipada y refinanciamiento. Esta lógica tiene que ser testeable de forma completamente aislada, sin base de datos, sin NestJS, con TypeScript puro. Los demás módulos son CRUD con algo de validación — Clean Architecture sería sobreingeniería innecesaria.
 
 ### Las capas y qué hace cada una
 
 **Domain** — el corazón. No importa nada de NestJS, Prisma, ni HTTP. Solo TypeScript puro.
 
-```typescript
-// domain/entities/loan.entity.ts
-export class LoanEntity {
-  constructor(
-    public readonly id: string,
-    public readonly capitalAmount: number,
-    public readonly interestRate: number,
-    public readonly totalInstallments: number,
-    public readonly currency: 'BOB' | 'USD',
-    public outstandingBalance: number,
-    public status: LoanStatus,
-  ) {}
+- **Entidades** (`entities/`): `LoanEntity` (raíz del agregado) y `InstallmentEntity` con métodos de negocio puros: `applyPayment()`, `revertPayment()`, `settleEarly()`, `markAsRefinanced()`, `recalculateStatus()`, `archive()`.
+- **Value Objects** (`value-objects/`): `Money` — inmutable, protegido contra coma flotante (usa `decimal.js`), prohíbe mezclar monedas.
+- **Enums** (`enums/`): `LoanStatus`, `InstallmentStatus`, `LoanScheduleType`, `PeriodType`, `LoanMode`.
+- **Repositorios** (`repositories/`): Interfaces abstractas (`LoanRepository`, `InstallmentRepository`, `PaymentRepository`). No saben que existe Prisma.
+- **Servicios de dominio** (`services/`): `LoanCalculatorService` — genera cronogramas de cuotas (EQUAL_INSTALLMENTS e INTEREST_ONLY), calcula fechas de vencimiento, absorción de redondeo en la última cuota.
+- **Errores** (`errors/`): 8 clases de error de dominio (ej. `PaymentExceedsBalanceError`, `LoanNotActiveError`, `CurrencyMismatchError`).
 
-  isActive(): boolean {
-    return this.status === LoanStatus.ACTIVE;
-  }
+**Application** — orquesta el dominio. Conoce los repositorios (por interfaz) pero no sabe que existe Prisma.
 
-  canBeRefinanced(): boolean {
-    return this.status === LoanStatus.ACTIVE && this.outstandingBalance > 0;
-  }
+- **Puertos** (`ports/`): `UnitOfWork` — abstracción transaccional genérica.
+- **Use-cases** (`use-cases/`): 10 casos de uso implementados. Cada uno encapsula una operación de negocio completa.
 
-  applyPayment(amount: number): void {
-    if (amount > this.outstandingBalance) {
-      throw new Error('El pago supera el saldo pendiente');
-    }
-    this.outstandingBalance -= amount;
-    if (this.outstandingBalance === 0) {
-      this.status = LoanStatus.COMPLETED;
-    }
-  }
-}
-```
+**Infrastructure** — la única capa que conoce Prisma y HTTP. Implementa los contratos del dominio.
 
-```typescript
-// domain/repositories/loan.repository.ts
-// Contrato puro — no sabe que existe Prisma
-export interface LoanRepository {
-  findById(id: string): Promise<LoanEntity | null>;
-  findByClientId(clientId: string): Promise<LoanEntity[]>;
-  save(loan: LoanEntity): Promise<LoanEntity>;
-  update(loan: LoanEntity): Promise<LoanEntity>;
-}
-```
+- **Repositorios** (`infrastructure/repositories/`): `PrismaLoanRepository`, `PrismaInstallmentRepository`, `PrismaPaymentRepository`.
+- **UnitOfWork** (`infrastructure/prisma-unit-of-work.ts`): Implementación con `prisma.$transaction()` interactive. Crea instancias transaccionales de los 3 repositorios.
+- **Mappers** (`infrastructure/mappers/`): Conversión Prisma ↔ Entidades de dominio (Decimal ↔ Money) y dominio ↔ Response DTO.
+- **Controller** (`infrastructure/loans.controller.ts`): Rutas REST. Maneja errores de dominio → `BadRequestException`.
 
-```typescript
-// domain/services/loan-calculator.service.ts
-// Lógica financiera pura — sin inyección de dependencias de NestJS
-export class LoanCalculatorService {
-  calculateInstallments(
-    capital: number,
-    interestRate: number,
-    totalInstallments: number,
-    startDate: Date,
-    periodType: PeriodType,
-  ): InstallmentEntity[] {
-    // cálculo puro, sin tocar BD
-    // la última cuota absorbe la diferencia de redondeo
-  }
-}
-```
-
-**Application** — orquesta el dominio. Conoce el repositorio (por interfaz) pero no sabe que existe Prisma.
-
-```typescript
-// application/use-cases/create-loan.use-case.ts
-export class CreateLoanUseCase {
-  constructor(
-    private readonly loanRepository: LoanRepository,  // ← interfaz, no implementación
-    private readonly calculator: LoanCalculatorService,
-  ) {}
-
-  async execute(input: CreateLoanInput): Promise<LoanEntity> {
-    const installments = this.calculator.calculateInstallments(
-      input.capitalAmount,
-      input.interestRate,
-      input.totalInstallments,
-      input.startDate,
-      input.periodType,
-    );
-    const loan = new LoanEntity(...);
-    return this.loanRepository.save(loan);
-  }
-}
-```
-
-**Infrastructure** — la única capa que conoce Prisma. Implementa el contrato del repositorio.
-
-```typescript
-// infrastructure/prisma-loan.repository.ts
-@Injectable()
-export class PrismaLoanRepository implements LoanRepository {
-  constructor(private readonly prisma: PrismaService) {}
-
-  async findById(id: string): Promise<LoanEntity | null> {
-    const raw = await this.prisma.loan.findUnique({ where: { id } });
-    if (!raw) return null;
-    return this.toEntity(raw);
-  }
-
-  async save(loan: LoanEntity): Promise<LoanEntity> {
-    const raw = await this.prisma.loan.create({ data: this.toPrisma(loan) });
-    return this.toEntity(raw);
-  }
-
-  private toEntity(raw: PrismaLoan): LoanEntity { ... }
-  private toPrisma(entity: LoanEntity): Prisma.LoanCreateInput { ... }
-}
-```
-
-**Inyección de dependencias en loans.module.ts:**
+### Inyección de dependencias en loans.module.ts
 
 > [!WARNING]
 > **Bug de DI con TypeScript y NestJS:**
 > Los repositorios de infraestructura usan `PrismaClientLike` (un type alias) en su constructor en lugar de `PrismaService`, para poder ser instanciados tanto por Nest (con el service global) como por el UnitOfWork (con el `tx` transaccional).
-> Sin embargo, TypeScript emite metadatos (`reflect-metadata`) para los alias como `Object`. Esto causa que NestJS lance `UnknownDependenciesException` al usar `useClass`. 
+> Sin embargo, TypeScript emite metadatos (`reflect-metadata`) para los alias como `Object`. Esto causa que NestJS lance `UnknownDependenciesException` al usar `useClass`.
 > **Solución:** Siempre debes usar `useFactory` e inyectar explícitamente el `PrismaService` cuando registres estos repositorios en el módulo.
 
 ```typescript
 @Module({
+  imports: [PrismaModule],
+  controllers: [LoansController],
   providers: [
     LoanCalculatorService,
     CreateLoanUseCase,
-    RefinanceLoanUseCase,
-    CalculateInstallmentsUseCase,
+    SimulateLoanUseCase,
+    LinkGuaranteeUseCase,
+    UnlinkGuaranteeUseCase,
+    GetLoanDetailUseCase,
+    RegisterPaymentUseCase,
+    VoidPaymentUseCase,
+    GetPaymentDashboardUseCase,
+    SettleLoanUseCase,
     {
-      provide: LoanRepository,         // ← token = interfaz
+      provide: LoanRepository,
       useFactory: (prisma: PrismaService) => new PrismaLoanRepository(prisma),
-      inject: [PrismaService],         // ← inyección manual segura
+      inject: [PrismaService],
+    },
+    {
+      provide: InstallmentRepository,
+      useFactory: (prisma: PrismaService) => new PrismaInstallmentRepository(prisma),
+      inject: [PrismaService],
+    },
+    {
+      provide: PaymentRepository,
+      useFactory: (prisma: PrismaService) => new PrismaPaymentRepository(prisma),
+      inject: [PrismaService],
+    },
+    {
+      provide: UnitOfWork,
+      useClass: PrismaUnitOfWork,
     },
   ],
-  controllers: [LoansController],
+  exports: [
+    CreateLoanUseCase,
+    RegisterPaymentUseCase,
+    VoidPaymentUseCase,
+    GetPaymentDashboardUseCase,
+    SettleLoanUseCase,
+    UnitOfWork,
+    LoanRepository,
+    InstallmentRepository,
+    PaymentRepository,
+  ],
 })
 export class LoansModule {}
 ```
 
+Los use-cases exportados son consumidos por `PaymentsModule` (su controller llama directamente a los use-cases de loans).
+
 ### Lo que NUNCA debe pasar en `domain/`
 
-- Ningún `import` de `@prisma/client`
+- Ningún `import` de `@prisma/client` o `../../generated/prisma`
 - Ningún `import` de `@nestjs/*`
 - Ningún acceso a variables de entorno
 - Ninguna llamada HTTP
 
 Si alguno de estos aparece en `domain/`, es un **error de arquitectura**.
+
+---
+
+## Módulo `cron` — Tarea programada de mora
+
+- `OverdueCron` (`overdue.cron.ts`): `@Cron('0 6 * * *', { timeZone: 'America/La_Paz' })` — ejecuta diario a las 6:00 AM La Paz.
+- `OverdueProcessorService` (`services/overdue-processor.service.ts`): Lógica de procesamiento reutilizable. Calcula `daysOverdue`, marca cuotas `OVERDUE`, actualiza `ClientStatus` (`CURRENT`/`DELINQUENT`). Respetando `graceDays` de `business_config`.
+- `CronController` (`cron.controller.ts`): Endpoint de fallback `POST /api/admin/recalculate-overdue` para forzar el recálculo manualmente.
+
+---
+
+## Módulo `dashboard` — Métricas del Home
+
+Patrón híbrido: usa un use-case (`GetHomeDashboardUseCase`) en `application/use-cases/` pero el módulo no tiene Clean Architecture completa. El use-case accede directamente a PrismaService (sin repositorio intermedio). Retorna `capitalEnCalle` (BOB/USD), `loansSummary`, `clientsSummary`, `overdueInstallments` y `generatedAt`.
+
+---
+
+## Módulo `stats` — Reportes financieros
+
+`StatsService` contiene la lógica de `getMonthlyStats` (5 secciones: period, incomeBreakdown, performanceSummary, riskIndicators, monthlyBalance) y `getMonthlyHistory` (arreglo cronológico para gráficas). Usa `getTodayLaPaz()` para calcular el período actual. Maneja multi-moneda sin mezclar BOB/USD.
+
+---
+
+## Módulo `guarantees` — CRUD con Cloudinary
+
+Estándar NestJS con `GuaranteesService`. Acepta `multipart/form-data` via `FileInterceptor` (multer `memoryStorage`). Sube imágenes a Cloudinary optimizadas a WebP (800×800px, quality 80) en la carpeta `{user.name}/garantias/`. Soft delete con protección `IN_USE`.
+
+---
+
+## Convertir Prisma Decimal ↔ Money
+
+**Al leer de Prisma** (en mappers):
+```typescript
+Money.of(new Decimal(raw.capitalAmount.toString()), currency)
+```
+
+**Al escribir a Prisma** (en mappers):
+```typescript
+entity.capitalAmount.toString()  // → "1000.00" (string para Prisma Decimal)
+```
+
+**En respuestas de la API:**
+- `LoanResponseDto`: montos como **string** con 2 decimales (para que el frontend haga parsing controlado).
+- `LoanDetailResponseDto` / `ClientProfileResponseDto`: montos como **number** (via `Number()`) para consumo inmediato.

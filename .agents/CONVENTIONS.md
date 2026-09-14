@@ -78,13 +78,10 @@ El `HttpExceptionFilter` está registrado globalmente en `main.ts`. No manejar e
 
 ## Seguridad
 
-- Todas las rutas protegidas con `JwtAuthGuard` excepto `/api/auth/login` y `/health`
+- Todas las rutas protegidas con `JwtAuthGuard` excepto `/api/auth/login`
 - Decorator `@CurrentUser() user: JwtPayload` para acceder al usuario. El ID del usuario está en **`user.sub`** (NO usar `@CurrentUser('id')` ya que el payload no tiene esa propiedad).
 - Validar que el recurso pertenece al usuario antes de operar — un admin no puede ver datos de otro admin
-- Rate limiting en `POST /api/auth/login`: máximo 5 intentos fallidos por IP en 15 minutos
-- Helmet configurado en `main.ts`
 - Contraseñas hasheadas con **bcrypt (rounds: 12)**
-- Los tokens de refresco se almacenan **hasheados** en BD — nunca en texto plano
 - **Nunca devolver `passwordHash`** en ninguna respuesta
 
 ---

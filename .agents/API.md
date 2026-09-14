@@ -69,10 +69,8 @@ DELETE /api/guarantees/:id                     → 200 OK (soft delete; bloquead
 POST   /api/loans                             → Loan + Installment[] generadas
 GET    /api/loans/:id                         → LoanDetail (con cuotas y pagos)
 GET    /api/loans/:id/installments            → Installment[]
-PATCH  /api/loans/:id                         → Loan
 POST   /api/loans/:id/guarantees              → LoanGuarantee (vincular garantía)
 DELETE /api/loans/:id/guarantees/:guaranteeId → 200 OK (desvincular)
-POST   /api/loans/:id/refinance               → LoanRefinance + nuevas Installment[]
 ```
 
 > **Bodies de create/simulate:**
@@ -173,15 +171,6 @@ GET  /api/stats/monthly-history?months=6   → MonthlyHistoryItemDto[]
 > **`GET /api/stats/monthly-history`:** Historial resumido de los últimos N meses para renderizar gráficas de barras o líneas en el frontend. **El arreglo se entrega en orden cronológico** (índice 0 = mes más antiguo, último índice = mes actual), listo para plotear de izquierda a derecha en el eje X. Cada ítem incluye: `interestCollected`, `netProfit`, `collectionRate` y `newLoansCount`. Opcional: `?months=6` (por defecto 6, máximo 24).
 
 
-## Config
-
-```
-GET    /api/config               → BusinessConfig
-PATCH  /api/config               → BusinessConfig
-```
-
----
-
 ## Admin
 
 ```
@@ -206,16 +195,6 @@ POST   /api/admin/recalculate-overdue → forzar recálculo manual del cron de m
 ```
 
 > **Nota Swagger / Postman:** Al acceder a Swagger UI (`/api`) o importar la colección en Postman (`/api-json`), el endpoint aparece listado bajo la categoría **admin**.
-
----
-
-## Health (público)
-
-```
-GET    /health                   → { status: 'ok', timestamp, database: 'connected' }
-```
-
----
 
 ## Formato de respuestas
 

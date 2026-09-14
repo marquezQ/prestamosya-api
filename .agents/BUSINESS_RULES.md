@@ -9,7 +9,7 @@ Reglas de negocio que el agente debe respetar en todo momento.
 
 - Un pago puede cubrir **una o varias cuotas** en una sola operación
 - Siempre se crea un registro en `payments` Y uno o más en `payment_installments`
-- `payment_installments.amount_applied` registra cuánto de ese pago fue a esa cuota específica
+- `payment_installments` contiene el desglose banking del pago aplicado a cada cuota: `interest_paid`, `capital_paid`, `interest_discounted`, `capital_discounted`
 - Los pagos **nunca se eliminan** — solo se anulan con `voided=true` y `void_reason` obligatorio
 - Al anular un pago: revertir `installment.paidAmount`, recalcular estado de la cuota y `loan.outstandingBalance`
 - **Usar `$transaction`** siempre que un pago modifique múltiples tablas

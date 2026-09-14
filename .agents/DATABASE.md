@@ -9,26 +9,26 @@ Convenciones: columnas en `snake_case` en BD (gestionado con `@map` en Prisma), 
 
 ## Resumen de tablas
 
-| Tabla | Descripción |
-|-------|-------------|
-| `users` | Administradores y cobradores del sistema |
-| `session_tokens` | Refresh tokens hasheados (revocables) |
-| `business_config` | Configuración del negocio por usuario |
-| `clients` | Prestatarios — soft delete con `deleted_at` |
-| `guarantees` | Bienes del cliente como garantía |
-| `guarantee_photos` | Fotos de garantías (URL del proveedor externo) |
-| `loans` | Préstamos activos e históricos |
-| `loan_guarantees` | Relación N:M entre préstamo y garantía |
-| `installments` | Cuotas del cronograma — nunca se eliminan |
-| `payments` | Pagos registrados — nunca se eliminan, solo se anulan |
-| `payment_installments` | Distribución de un pago entre cuotas |
-| `loan_refinances` | Snapshot histórico de cada refinanciamiento |
+| Tabla                  | Descripción                                             |
+| ---------------------- | ------------------------------------------------------- |
+| `users`                | Administradores y cobradores del sistema                |
+| `session_tokens`       | Refresh tokens hasheados (revocables)                   |
+| `business_config`      | Configuración del negocio por usuario                   |
+| `clients`              | Prestatarios — soft delete con `deleted_at`             |
+| `guarantees`           | Bienes del cliente como garantía                        |
+| `guarantee_photos`     | Fotos de garantías (URL del proveedor externo)          |
+| `loans`                | Préstamos activos e históricos                          |
+| `loan_guarantees`      | Relación N:M entre préstamo y garantía                  |
+| `installments`         | Cuotas del cronograma — nunca se eliminan               |
+| `payments`             | Pagos registrados — nunca se eliminan, solo se anulan   |
+| `payment_installments` | Distribución de un pago entre cuotas (desglose banking) |
+| `loan_refinances`      | Snapshot histórico de cada refinanciamiento             |
 
 ---
 
 ## Esquema completo (Prisma)
 
-> **Nota sobre timestamps:** El bloque de schema siguiente es histórico/resumido. Para el detalle actual de tipos de columna (todas las marcas temporales son `@db.Timestamptz(3)` y las de solo fecha `@db.Date`) y la política de zona horaria, ver la sección [Zonas horarias y timestamps](#zonas-horarias-y-timestamps). La fuente de verdad es `prisma/schema.prisma`.
+> **Nota:** La fuente de verdad es `prisma/schema.prisma`. Este bloque refleja el estado actualizado con todos los campos incluidos `scheduleType`, `discountAmount` y el reestructurado `payment_installments`.
 
 ```prisma
 generator client {
@@ -41,82 +41,21 @@ datasource db {
   provider = "postgresql"
 }
 
-> **Nota:** Este proyecto usa **Prisma v7**. El generador es `prisma-client` (no `prisma-client-js`) con `moduleFormat = "commonjs"` para que el cliente generado sea compatible con la compilación CommonJS de NestJS. La `url` de conexión no va en el `datasource`; se inyecta desde `prisma.config.ts` (`defineConfig({ datasource: { url: process.env['DATABASE_URL'] } })`). Ver `STACK.md` → "Configuración del sistema de módulos".
-
 // ─── ENUMS ───────────────────────────────────────────
 
-enum Role {
-  admin
-  collector
-}
-
-enum Currency {
-  BOB
-  USD
-}
-
-enum PeriodType {
-  daily
-  weekly
-  fortnightly
-  monthly
-  custom
-}
-
-enum LoanMode {
-  automatic
-  manual
-}
-
-enum LoanStatus {
-  ACTIVE
-  COMPLETED
-  DEFAULTED
-  REFINANCED
-}
-
-enum InstallmentStatus {
-  PENDING
-  PARTIAL
-  PAID
-  OVERDUE
-}
-
-enum PaymentMethod {
-  cash
-  transfer
-  qr     // Deprecado: la app solo acepta cash y transfer. qr permanece en DB por compatibilidad.
-}
-
-enum ClientStatus {
-  NO_LOAN
-  CURRENT
-  DELINQUENT
-}
-
-enum GuaranteeType {
-  VEHICLE
-  REAL_ESTATE
-  FURNITURE
-  OTHER
-}
-
-enum GuaranteeStatus {
-  AVAILABLE
-  IN_USE
-  RELEASED
-}
-
-enum GuaranteeLinkStatus {
-  ACTIVE
-  RELEASED
-}
-
-enum RefinanceType {
-  EXTEND_TERM
-  ADDITIONAL_AMOUNT
-  NEW_RATE
-}
+enum Role { admin, collector }
+enum Currency { BOB, USD }
+enum PeriodType { daily, weekly, fortnightly, monthly, custom }
+enum LoanMode { automatic, manual }
+enum LoanScheduleType { EQUAL_INSTALLMENTS, INTEREST_ONLY }
+enum LoanStatus { ACTIVE, COMPLETED, DEFAULTED, REFINANCED }
+enum InstallmentStatus { PENDING, PARTIAL, PAID, OVERDUE }
+enum PaymentMethod { cash, transfer, qr }  // qr deprecado
+enum ClientStatus { NO_LOAN, CURRENT, DELINQUENT }
+enum GuaranteeType { VEHICLE, REAL_ESTATE, FURNITURE, OTHER }
+enum GuaranteeStatus { AVAILABLE, IN_USE, RELEASED }
+enum GuaranteeLinkStatus { ACTIVE, RELEASED }
+enum RefinanceType { EXTEND_TERM, ADDITIONAL_AMOUNT, NEW_RATE }
 
 // ─── MODELOS ─────────────────────────────────────────
 
@@ -127,15 +66,13 @@ model User {
   passwordHash  String   @map("password_hash") @db.VarChar(255)
   role          Role     @default(admin)
   isActive      Boolean  @default(true) @map("is_active")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  sessionTokens  SessionToken[]
+  createdAt     DateTime @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3) @map("updated_at")
   businessConfig BusinessConfig?
   clients        Client[]
   loans          Loan[]
   payments       Payment[]
-
+  sessionTokens  SessionToken[]
   @@map("users")
 }
 
@@ -143,12 +80,10 @@ model SessionToken {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
   tokenHash String   @map("token_hash") @db.VarChar(255)
-  expiresAt DateTime @map("expires_at")
+  expiresAt DateTime @db.Timestamptz(3) @map("expires_at")
   revoked   Boolean  @default(false)
-  createdAt DateTime @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id])
-
+  createdAt DateTime @default(now()) @db.Timestamptz(3) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id])
   @@map("session_tokens")
 }
 
@@ -161,34 +96,31 @@ model BusinessConfig {
   defaultInterestRate Decimal?    @map("default_interest_rate") @db.Decimal(5, 2)
   defaultPeriodType   PeriodType? @map("default_period_type")
   graceDays           Int         @default(0) @map("grace_days")
-  createdAt           DateTime    @default(now()) @map("created_at")
-  updatedAt           DateTime    @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id])
-
+  createdAt           DateTime    @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt           DateTime    @updatedAt @db.Timestamptz(3) @map("updated_at")
+  user                User        @relation(fields: [userId], references: [id])
   @@map("business_config")
 }
 
 model Client {
-  id           String       @id @default(uuid())
-  userId       String       @map("user_id")
-  fullName     String       @map("full_name") @db.VarChar(150)
-  idNumber     String       @unique @map("id_number") @db.VarChar(20)
-  phone        String       @db.VarChar(20)
-  phoneAlt     String?      @map("phone_alt") @db.VarChar(20)
-  address      String?
-  latitude     Decimal?     @db.Decimal(10, 8)
-  longitude    Decimal?     @db.Decimal(11, 8)
-  status       ClientStatus @default(NO_LOAN)
-  notes        String?
-  deletedAt    DateTime?    @map("deleted_at")
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
-
-  user       User        @relation(fields: [userId], references: [id])
-  loans      Loan[]
+  id         String       @id @default(uuid())
+  userId     String       @map("user_id")
+  fullName   String       @map("full_name") @db.VarChar(150)
+  idNumber   String       @map("id_number") @db.VarChar(20)
+  phone      String       @db.VarChar(20)
+  phoneAlt   String?      @map("phone_alt") @db.VarChar(20)
+  address    String?
+  latitude   Decimal?     @db.Decimal(10, 8)
+  longitude  Decimal?     @db.Decimal(11, 8)
+  status     ClientStatus @default(NO_LOAN)
+  notes      String?
+  deletedAt  DateTime?    @db.Timestamptz(3) @map("deleted_at")
+  createdAt  DateTime     @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt  DateTime     @updatedAt @db.Timestamptz(3) @map("updated_at")
+  user       User         @relation(fields: [userId], references: [id])
   guarantees Guarantee[]
-
+  loans      Loan[]
+  @@unique([userId, idNumber])
   @@index([phone])
   @@index([fullName])
   @@index([status])
@@ -203,14 +135,12 @@ model Guarantee {
   description    String
   estimatedValue Decimal?        @map("estimated_value") @db.Decimal(12, 2)
   status         GuaranteeStatus @default(AVAILABLE)
-  deletedAt      DateTime?       @map("deleted_at")
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
-
-  client       Client           @relation(fields: [clientId], references: [id])
-  photos       GuaranteePhoto[]
-  loanLinks    LoanGuarantee[]
-
+  deletedAt      DateTime?       @db.Timestamptz(3) @map("deleted_at")
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt      DateTime        @updatedAt @db.Timestamptz(3) @map("updated_at")
+  client         Client          @relation(fields: [clientId], references: [id])
+  photos         GuaranteePhoto[]
+  loanLinks      LoanGuarantee[]
   @@index([clientId])
   @@index([status])
   @@map("guarantees")
@@ -220,40 +150,37 @@ model GuaranteePhoto {
   id          String   @id @default(uuid())
   guaranteeId String   @map("guarantee_id")
   fileUrl     String   @map("file_url") @db.VarChar(500)
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  guarantee Guarantee @relation(fields: [guaranteeId], references: [id])
-
+  createdAt   DateTime @default(now()) @db.Timestamptz(3) @map("created_at")
+  guarantee   Guarantee @relation(fields: [guaranteeId], references: [id])
   @@map("guarantee_photos")
 }
 
 model Loan {
-  id                 String      @id @default(uuid())
-  clientId           String      @map("client_id")
-  createdBy          String      @map("created_by")
+  id                 String          @id @default(uuid())
+  clientId           String          @map("client_id")
+  createdBy          String          @map("created_by")
   mode               LoanMode
-  capitalAmount      Decimal     @map("capital_amount") @db.Decimal(12, 2)
-  currency           Currency    @default(BOB)
-  interestRate       Decimal     @default(0) @map("interest_rate") @db.Decimal(5, 2)
-  periodType         PeriodType? @map("period_type")
-  totalInstallments  Int         @map("total_installments")
-  totalAmount        Decimal     @map("total_amount") @db.Decimal(12, 2)
-  totalPaid          Decimal     @default(0) @map("total_paid") @db.Decimal(12, 2)
-  outstandingBalance Decimal     @map("outstanding_balance") @db.Decimal(12, 2)
-  status             LoanStatus  @default(ACTIVE)
-  startDate          DateTime    @map("start_date") @db.Date
-  firstDueDate       DateTime    @map("first_due_date") @db.Date
+  scheduleType       LoanScheduleType @default(EQUAL_INSTALLMENTS) @map("schedule_type")
+  capitalAmount      Decimal         @map("capital_amount") @db.Decimal(12, 2)
+  currency           Currency        @default(BOB)
+  interestRate       Decimal         @default(0) @map("interest_rate") @db.Decimal(5, 2)
+  periodType         PeriodType?     @map("period_type")
+  totalInstallments  Int             @map("total_installments")
+  totalAmount        Decimal         @map("total_amount") @db.Decimal(12, 2)
+  totalPaid          Decimal         @default(0) @map("total_paid") @db.Decimal(12, 2)
+  outstandingBalance Decimal         @map("outstanding_balance") @db.Decimal(12, 2)
+  status             LoanStatus      @default(ACTIVE)
+  startDate          DateTime        @map("start_date") @db.Date
+  firstDueDate       DateTime        @map("first_due_date") @db.Date
   notes              String?
-  createdAt          DateTime    @default(now()) @map("created_at")
-  updatedAt          DateTime    @updatedAt @map("updated_at")
-
-  client       Client          @relation(fields: [clientId], references: [id])
-  creator      User            @relation(fields: [createdBy], references: [id])
-  installments Installment[]
-  payments     Payment[]
-  guarantees   LoanGuarantee[]
-  refinances   LoanRefinance[]
-
+  createdAt          DateTime        @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt          DateTime        @updatedAt @db.Timestamptz(3) @map("updated_at")
+  installments       Installment[]
+  guarantees         LoanGuarantee[]
+  refinances         LoanRefinance[]
+  client             Client          @relation(fields: [clientId], references: [id])
+  creator            User            @relation(fields: [createdBy], references: [id])
+  payments           Payment[]
   @@index([clientId])
   @@index([status])
   @@index([clientId, status])
@@ -265,12 +192,10 @@ model LoanGuarantee {
   loanId      String              @map("loan_id")
   guaranteeId String              @map("guarantee_id")
   status      GuaranteeLinkStatus @default(ACTIVE)
-  createdAt   DateTime            @default(now()) @map("created_at")
-  releasedAt  DateTime?           @map("released_at")
-
-  loan      Loan      @relation(fields: [loanId], references: [id])
-  guarantee Guarantee @relation(fields: [guaranteeId], references: [id])
-
+  createdAt   DateTime            @default(now()) @db.Timestamptz(3) @map("created_at")
+  releasedAt  DateTime?           @db.Timestamptz(3) @map("released_at")
+  guarantee   Guarantee           @relation(fields: [guaranteeId], references: [id])
+  loan        Loan                @relation(fields: [loanId], references: [id], onDelete: Cascade)
   @@index([loanId])
   @@index([guaranteeId])
   @@map("loan_guarantees")
@@ -287,14 +212,12 @@ model Installment {
   paidAmount        Decimal           @default(0) @map("paid_amount") @db.Decimal(12, 2)
   status            InstallmentStatus @default(PENDING)
   daysOverdue       Int               @default(0) @map("days_overdue")
-  paidAt            DateTime?         @map("paid_at")
+  paidAt            DateTime?         @db.Timestamptz(3) @map("paid_at")
   archived          Boolean           @default(false)
-  createdAt         DateTime          @default(now()) @map("created_at")
-  updatedAt         DateTime          @updatedAt @map("updated_at")
-
-  loan         Loan                 @relation(fields: [loanId], references: [id])
-  paymentLinks PaymentInstallment[]
-
+  createdAt         DateTime          @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt         DateTime          @updatedAt @db.Timestamptz(3) @map("updated_at")
+  loan              Loan              @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  paymentLinks      PaymentInstallment[]
   @@index([loanId])
   @@index([dueDate])
   @@index([status])
@@ -303,22 +226,21 @@ model Installment {
 }
 
 model Payment {
-  id           String        @id @default(uuid())
-  loanId       String        @map("loan_id")
-  registeredBy String        @map("registered_by")
-  amount       Decimal       @db.Decimal(12, 2)
-  paymentDate  DateTime      @map("payment_date") @db.Date
-  method       PaymentMethod @default(cash)
-  notes        String?
-  voided       Boolean       @default(false)
-  voidedAt     DateTime?     @map("voided_at")
-  voidReason   String?       @map("void_reason")
-  createdAt    DateTime      @default(now()) @map("created_at")
-
-  loan             Loan                 @relation(fields: [loanId], references: [id])
-  registrar        User                 @relation(fields: [registeredBy], references: [id])
+  id               String               @id @default(uuid())
+  loanId           String               @map("loan_id")
+  registeredBy     String               @map("registered_by")
+  amount           Decimal              @db.Decimal(12, 2)
+  discountAmount   Decimal              @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  paymentDate      DateTime             @map("payment_date") @db.Date
+  method           PaymentMethod        @default(cash)
+  notes            String?
+  voided           Boolean              @default(false)
+  voidedAt         DateTime?            @db.Timestamptz(3) @map("voided_at")
+  voidReason       String?              @map("void_reason")
+  createdAt        DateTime             @default(now()) @db.Timestamptz(3) @map("created_at")
   installmentLinks PaymentInstallment[]
-
+  loan             Loan                 @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  registrar        User                 @relation(fields: [registeredBy], references: [id])
   @@index([loanId])
   @@index([paymentDate])
   @@index([voided])
@@ -326,14 +248,15 @@ model Payment {
 }
 
 model PaymentInstallment {
-  id            String  @id @default(uuid())
-  paymentId     String  @map("payment_id")
-  installmentId String  @map("installment_id")
-  amountApplied Decimal @map("amount_applied") @db.Decimal(12, 2)
-
-  payment     Payment     @relation(fields: [paymentId], references: [id])
-  installment Installment @relation(fields: [installmentId], references: [id])
-
+  id                 String      @id @default(uuid())
+  paymentId          String      @map("payment_id")
+  installmentId      String      @map("installment_id")
+  interestPaid       Decimal     @default(0) @map("interest_paid")       @db.Decimal(12, 2)
+  capitalPaid        Decimal     @default(0) @map("capital_paid")        @db.Decimal(12, 2)
+  interestDiscounted Decimal     @default(0) @map("interest_discounted") @db.Decimal(12, 2)
+  capitalDiscounted  Decimal     @default(0) @map("capital_discounted")  @db.Decimal(12, 2)
+  installment        Installment @relation(fields: [installmentId], references: [id], onDelete: Cascade)
+  payment            Payment     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   @@index([paymentId])
   @@index([installmentId])
   @@map("payment_installments")
@@ -352,10 +275,8 @@ model LoanRefinance {
   newInstallments      Int           @map("new_installments")
   newTotalAmount       Decimal       @map("new_total_amount") @db.Decimal(12, 2)
   notes                String?
-  createdAt            DateTime      @default(now()) @map("created_at")
-
-  loan Loan @relation(fields: [loanId], references: [id])
-
+  createdAt            DateTime      @default(now()) @db.Timestamptz(3) @map("created_at")
+  loan                 Loan          @relation(fields: [loanId], references: [id], onDelete: Cascade)
   @@index([loanId])
   @@map("loan_refinances")
 }
@@ -363,15 +284,40 @@ model LoanRefinance {
 
 ---
 
-## Migraciones y Seeding (Prisma 7)
+## ON DELETE CASCADE en relaciones de loans
 
-### Migraciones aplicadas
+> [!IMPORTANT]
+> Borrar un registro en `loans` cascada automáticamente hacia todas las tablas dependientes:
+>
+> | Tabla hija             | Efecto                                                                   |
+> | ---------------------- | ------------------------------------------------------------------------ |
+> | `installments`         | Se borran todas las cuotas del préstamo                                  |
+> | `payment_installments` | Se borran los desgloses (vía cascade desde installments Y payments)      |
+> | `payments`             | Se borran todos los pagos registrados                                    |
+> | `loan_guarantees`      | Se borran los links (las garantías NO se borran — pertenecen al cliente) |
+> | `loan_refinances`      | Se borran los snapshots de refinanciamiento                              |
+>
+> **NO se borran** (permanecen intactos): `clients`, `guarantees`, `guarantee_photos`, `users`, `session_tokens`, `business_config`.
+>
+> Esto es intencional: fue diseñado para facilitar la limpieza de datos de prueba en desarrollo. No existe un endpoint API que borre loans — solo se puede hacer desde el cliente de BD directamente.
 
-| Migración | Descripción |
-|-----------|-------------|
-| `20260615150807_init` | Esquema inicial del MVP |
-| `20260818012602_add_fortnightly_period` | Agrega `fortnightly` (quincenal) al enum `PeriodType`. Aplicada en dev y se aplicará automáticamente en prod vía `prisma migrate deploy` en el CI/CD |
-| `20260827181308_timestamps_timestamptz` | Convierte todas las columnas de marca temporal (`created_at`, `updated_at`, `deleted_at`, `expires_at`, `paid_at`, `voided_at`, `released_at`) de `TIMESTAMP` a `TIMESTAMPTZ`. Las columnas de solo fecha (`start_date`, `first_due_date`, `due_date`, `payment_date`) se mantienen como `DATE`. Ver sección "Zonas horarias y timestamps" más abajo |
+---
+
+## Migraciones aplicadas
+
+| Migración                                                            | Descripción                                                                                                                                                                                           |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `20260615150807_init`                                                | Esquema inicial del MVP                                                                                                                                                                               |
+| `20260818012602_add_fortnightly_period`                              | Agrega `fortnightly` al enum `PeriodType`                                                                                                                                                             |
+| `20260827181308_timestamps_timestamptz`                              | Convierte todas las columnas de marca temporal a `TIMESTAMPTZ`. Columnas de solo fecha (`start_date`, `first_due_date`, `due_date`, `payment_date`) se mantienen como `DATE`                          |
+| `20260830153853_add_discount_amount_to_payments`                     | Agrega `discount_amount` DECIMAL(12,2) default 0 a `payments`                                                                                                                                         |
+| `20260831012844_add_schedule_type_to_loans`                          | Crea enum `LoanScheduleType` (`EQUAL_INSTALLMENTS`, `INTEREST_ONLY`) y agrega `schedule_type` a `loans`                                                                                               |
+| `20260907224500_composite_client_id_number`                          | Cambia unique de `id_number` (solo) a compuesto `(user_id, id_number)` — permite mismo CI entre usuarios distintos                                                                                    |
+| `20260911010000_add_discount_applied_to_payment_installments`        | Agrega `discount_applied` a `payment_installments` (pre-reestructuración)                                                                                                                             |
+| `20260911023000_restructure_payment_installments_explicit_breakdown` | **Reestructura** `payment_installments`: reemplaza `amount_applied`/`discount_applied` por `interest_paid`, `capital_paid`, `interest_discounted`, `capital_discounted`. Backfill de datos históricos |
+| `20260911032000_backfill_historical_payment_installments`            | Recalcula desgloses históricos en pagos donde interest_paid y capital_paid quedaron en 0                                                                                                              |
+| `20260911033000_fix_backfill_payment_installments`                   | Corrige sobre-asignación de capital en pagos históricos donde la suma de links excedía el monto del pago                                                                                              |
+| `20260914144933_add_cascade_delete_loan_relations`                   | Agrega `ON DELETE CASCADE` a las 6 FKs que referencian `loans`: installments, payments, payment_installments (×2), loan_guarantees, loan_refinances                                                   |
 
 ---
 
@@ -381,41 +327,21 @@ La aplicación **almacena y transmite todo en UTC**, y reserva `America/La_Paz` 
 
 Cómo se implementa:
 
-- **Almacenamiento/sesión en UTC**: `src/prisma/prisma.service.ts` crea el `Pool` de `pg` **sin forzar zona horaria** (la sesión queda en UTC, el default de PostgreSQL). No se usa `options: '-c timezone=...'`: `@prisma/adapter-pg` serializa los `Date` en UTC sin sufijo de zona y normaliza la lectura a `+00:00`; forzar `America/La_Paz` desfasaría +4h/-4h todos los campos `timestamptz`. La DB almacena así el instante absoluto correcto.
+- **Almacenamiento/sesión en UTC**: `src/prisma/prisma.service.ts` crea el `Pool` de `pg` **sin forzar zona horaria** (la sesión queda en UTC, el default de PostgreSQL).
 - **`src/main.ts`**: fija `process.env.TZ = 'America/La_Paz'` para que los cálculos de "día actual" en la capa de aplicación (`getTodayLaPaz()`, cron de mora, etc.) usen el día de negocio boliviano.
-- **Columnas de marca temporal** son `TIMESTAMPTZ(3)` (`@db.Timestamptz(3)` en Prisma): PostgreSQL almacena el instante absoluto (UTC interno).
-- **Columnas de solo fecha** (`@db.Date`): `Loan.startDate`, `Loan.firstDueDate`, `Installment.dueDate`, `Payment.paymentDate` — representan un día de negocio y se mantienen como `DATE`.
-
-**Respuestas de la API:** los timestamps se serializan a ISO 8601 con `Z` (UTC) vía `Date.toISOString()`. Es el mismo instante absoluto; el frontend es responsable de convertirlo a su zona para mostrar (o `America/La_Paz`).
-
-**Verificación rápida en prod:** `SHOW timezone` debe devolver `UTC` (por defecto). Si algún panel cliente fuerza otra zona en la sesión, consultar `SELECT now()` y confirmar que los `timestamptz` leídos se normalizan a `+00:00`.
-
-## Fechas, no horas
-
-La regla es **trabajar con fechas, no con horas**. Esto se aplica a todo el dominio de préstamos para evitar la complejidad y los errores de zona horaria:
-
-- **Cronogramas por fecha:** los cronogramas de cuotas se generan **por fecha** (`Installment.dueDate`, columna `DATE`), nunca por hora. Un préstamo se crea "por fecha" y cada cuota vence en un día calendario concreto.
-- **Los pagos se registran por fecha:** al registrar un pago, el frontend/mobile envía el **`paymentDate`** (`YYYY-MM-DD`, columna `DATE`). El sistema no deduce "cuándo" pagó a partir de la hora de procesamiento.
+- **Columnas de marca temporal** son `TIMESTAMPTZ(3)` (`@db.Timestamptz(3)` en Prisma).
+- **Columnas de solo fecha** (`@db.Date`): `Loan.startDate`, `Loan.firstDueDate`, `Installment.dueDate`, `Payment.paymentDate`.
 
 ## Fuente de verdad de los pagos
 
-Para **payments realizados**, la **única fuente de verdad es la fecha de pago (`Payment.paymentDate`)** que envía el frontend/mobile.
+La **única fuente de verdad es la fecha de pago (`Payment.paymentDate`)** que envía el frontend. El `Installment.paidAt` es un metadato de auditoría (cuándo procesó el backend), **no** la fuente de verdad de la fecha de pago.
 
-- El `paymentDate` enviado por el cliente define en qué día queda contabilizado el pago (por ejemplo, al registrar un pago a una cuota vencida se envía la fecha efectiva de pago, no la fecha del procesamiento).
-- La segmentación "pagados hoy" del dashboard se basa en **`Payment.paymentDate`**, no en la marca de procesamiento (`Installment.paidAt` / `created_at`) ni en la hora.
-- `Installment.paidAt` es un metadato de auditoría (cuándo procesó el backend), **no** es la fuente de verdad de la fecha de pago.
+---
 
-## UTC absoluto en la base de datos
+## Configuración de Migraciones (Prisma 7)
 
-Toda la base de datos almacena **instantes absolutos en UTC**:
-
-- Las columnas de marca temporal (`@db.Timestamptz(3)`: `created_at`, `updated_at`, `paid_at`, `voided_at`, etc.) guardan el instante absoluto en UTC, sin depender de la zona del VPS ni de la sesión.
-- Las columnas de **solo fecha** (`@db.Date`: `payment_date`, `due_date`, `start_date`, `first_due_date`) representan un día calendario sin zona.
-- La conversión a `America/La_Paz` ocurre **solo** en la capa de presentación (frontend/mobile).
-
-### Configuración
-En **Prisma 7**, las migraciones y la ejecución de seeds se centralizan en `prisma.config.ts` (en lugar de `package.json`):
 ```typescript
+// prisma.config.ts
 export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
@@ -428,55 +354,24 @@ export default defineConfig({
 });
 ```
 
-### Script de Seed (`prisma/seed.ts`)
-El script de inicialización realiza las siguientes operaciones en orden:
-1. **Conexión Nativa (`@prisma/adapter-pg`)**: Crea un pool con `pg` y su adaptador, lo cual es obligatorio en la configuración actual de Prisma v7.
-2. **Usuarios Administradores**: Realiza un `upsert` para crear dos administradores:
-   - **Admin 1**: username `admin`, password `admin123` — 2 clientes asignados
-   - **Admin 2**: username `admin2`, password `admin123` — 1 cliente asignado
-3. **Configuración de Negocio**: Crea un registro en `business_config` para cada administrador.
-4. **Clientes**: Crea 3 clientes totales (2 para admin1, 1 para admin2) con datos de prueba variados.
-
 ### Comandos de Base de Datos (pnpm)
-- **Ejecutar Seed manualmente**:
-  ```bash
-  pnpm exec prisma db seed
-  ```
-- **Crear y aplicar migraciones en desarrollo**:
-  ```bash
-  pnpm exec prisma migrate dev --name <nombre_migracion>
-  ```
-- **Sincronizar base de datos sin generar migración (Desarrollo local solamente)**:
-  ```bash
-  pnpm exec prisma db push
-  ```
 
----
-
-## Estrategia de Migraciones en Producción (CI/CD) y Resolución de Errores
-
-### `prisma db push` vs `prisma migrate deploy`
-
-> [!WARNING]
-> **Diferencia Crítica:** `pnpm exec prisma db push` modifica la estructura de la base de datos directamente **SIN registrar el historial en la tabla `_prisma_migrations`**.
->
-> Por el contrario, los despliegues automáticos en servidor/VPS (`deploy.yml`) ejecutan `pnpm exec prisma migrate deploy`, el cual **requiere obligatoriamente** leer la tabla `_prisma_migrations` para saber qué scripts de migración faltan por aplicar.
-
-### Error P3005: `The database schema is not empty`
-
-Si en algún momento se ejecuta `prisma db push --force-reset` o se crea la base de datos manualmente sin ejecutar las migraciones oficiales, la base de datos contendrá tablas pero **carecerá de la tabla `_prisma_migrations`**.
-
-En el siguiente `git push` a `develop`, GitHub Actions fallará con el error:
-```text
-Error: P3005: The database schema is not empty.
-Read more about how to baseline an existing production database: https://pris.ly/d/migrate-baseline
+```bash
+pnpm exec prisma db seed              # Ejecutar seed
+pnpm exec prisma migrate dev --name x # Crear + aplicar migración en dev
+pnpm exec prisma migrate deploy       # Aplicar pendientes (producción)
+pnpm exec prisma migrate status       # Ver estado
+pnpm exec prisma db push              # Sync sin migración (dev local solamente)
 ```
 
-### Solución SIN Pérdida de Datos (`baseline` de migraciones)
+### Estrategia de Migraciones en Producción
 
-Para solucionar el error P3005 en el VPS **preservando el 100% de los datos de clientes, préstamos y pagos ya registrados**, nunca se debe borrar la base de datos. En su lugar, se le indica a Prisma que marque las migraciones existentes como ya aplicadas (`--applied`):
+> [!WARNING]
+> `prisma db push` modifica la BD **SIN registrar historial en `_prisma_migrations`**.
+> `prisma migrate deploy` **REQUIERE** esa tabla. Si se ejecuta `db push` primero, hay que hacer `baseline` con `migrate resolve --applied`.
 
-Ejecutar en la terminal del VPS (`/var/www/prestamosya/prestamosya-api`):
+### Solución P3005 (baseline sin pérdida de datos)
+
 ```bash
 pnpm exec prisma migrate resolve --applied 20260615150807_init
 pnpm exec prisma migrate resolve --applied 20260818012602_add_fortnightly_period
@@ -484,6 +379,11 @@ pnpm exec prisma migrate resolve --applied 20260827181308_timestamps_timestamptz
 pnpm exec prisma migrate resolve --applied 20260830153853_add_discount_amount_to_payments
 pnpm exec prisma migrate resolve --applied 20260831012844_add_schedule_type_to_loans
 pnpm exec prisma migrate resolve --applied 20260907224500_composite_client_id_number
+pnpm exec prisma migrate resolve --applied 20260911010000_add_discount_applied_to_payment_installments
+pnpm exec prisma migrate resolve --applied 20260911023000_restructure_payment_installments_explicit_breakdown
+pnpm exec prisma migrate resolve --applied 20260911032000_backfill_historical_payment_installments
+pnpm exec prisma migrate resolve --applied 20260911033000_fix_backfill_payment_installments
+pnpm exec prisma migrate resolve --applied 20260914144933_add_cascade_delete_loan_relations
 ```
 
 **Resultado:** Prisma creará la tabla `_prisma_migrations`, registrará las migraciones en el historial sin tocar ninguna fila existente, y desbloqueará inmediatamente el CI/CD de GitHub Actions.
