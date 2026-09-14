@@ -7,6 +7,10 @@ import { PrismaService } from '../prisma/prisma.service';
 export interface PrismaServiceMock {
   user: {
     findUnique: jest.Mock;
+    update: jest.Mock;
+  };
+  businessConfig: {
+    upsert: jest.Mock;
   };
   client: {
     findMany: jest.Mock;
@@ -44,6 +48,10 @@ export function createPrismaMock(): PrismaServiceMock {
   const mock: PrismaServiceMock = {
     user: {
       findUnique: jest.fn(),
+      update: jest.fn(),
+    },
+    businessConfig: {
+      upsert: jest.fn(),
     },
     client: {
       findMany: jest.fn(),

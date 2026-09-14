@@ -83,6 +83,8 @@ El `HttpExceptionFilter` está registrado globalmente en `main.ts`. No manejar e
 - Validar que el recurso pertenece al usuario antes de operar — un admin no puede ver datos de otro admin
 - Contraseñas hasheadas con **bcrypt (rounds: 12)**
 - **Nunca devolver `passwordHash`** en ninguna respuesta
+- **Responsabilidad de módulos:** `auth` = autenticación (login, guards, tokens). La cuenta de usuario (perfil/contraseña) vive en `users` ("mi cuenta", rutas `/users/me`) y la configuración del negocio en `business-config` (rutas `/business-config`). **No mezclar dominios en `auth`.**
+- **Respuesta de usuario ≠ payload del JWT:** `GET /auth/me` refleja solo el payload del token; si se necesitan datos frescos (p. ej. `isActive`, fechas) usar `GET /users/me`, que lee de la BD con un `select` que nunca filtra el `passwordHash`.
 
 ---
 

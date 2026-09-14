@@ -88,7 +88,7 @@ Reglas de la reorganización:
 
 ---
 
-## 4. Estrategia por módulo (estado actual: auth, clients, loans, guarantees, payments, dashboard, stats, cron)
+## 4. Estrategia por módulo (estado actual: auth, users, business-config, clients, loans, guarantees, payments, dashboard, stats, cron)
 
 ### Módulo `auth`
 | Unidad | Tipo | Prioridad | Qué cubrir |
@@ -97,6 +97,19 @@ Reglas de la reorganización:
 | `jwt.strategy` | Unit | 🟡 Medio | `validate` con `sub` → devuelve payload; sin `sub` → `UnauthorizedException` |
 | `jwt-auth.guard` | Unit | 🟢 Bajo | comportamiento con las rutas `@Public()` |
 | `auth.controller` | — | Debería no | pura delegación, no aporta valor |
+
+### Módulo `users` (cuenta / self-service)
+| Unidad | Tipo | Prioridad | Qué cubrir |
+|--------|------|-----------|-----------|
+| `users.service.getProfile` | Unit | 🟡 Media | `select` seguro (nunca `passwordHash`), usuario inexistente → 401 |
+| `users.service.updateProfile` | Unit | 🔴 Alta | actualiza solo `name` con el `userId`, devuelve datos frescos **sin `passwordHash`** |
+| `users.service.changePassword` | Unit | 🔴 Alta | hashea con bcrypt 12 y actualiza `passwordHash`, contraseña actual incorrecta → `BadRequestException` (400, no 401), nueva igual a la actual → `BadRequestException`, no actualiza si falla la verificación |
+| `users.controller` | — | Debería no | pura delegación |
+
+### Módulo `business-config`
+| Unidad | Tipo | Prioridad | Qué cubrir |
+|--------|------|-----------|-----------|
+| `business-config.service` | Unit | 🟡 Media | patrón UPSERT (auto-crea con defaults), actualización parcial (los `undefined` no se incluyen), Decimal → string al escribir / string → number al leer |
 
 ### Módulo `clients`
 | Unidad | Tipo | Prioridad | Qué cubrir |
@@ -203,6 +216,8 @@ const prismaMock = {
 ```
 src/modules/auth/auth.service.spec.ts              (unit)
 src/modules/auth/strategies/jwt.strategy.spec.ts   (unit)
+src/modules/users/users.service.spec.ts            (unit - cuenta/self-service)
+src/modules/business-config/business-config.service.spec.ts (unit)
 src/modules/clients/clients.service.spec.ts        (unit)
 src/modules/loans/domain/**/*.spec.ts              (unit - dominio)
 src/modules/loans/application/**/*.spec.ts         (unit - use cases)
@@ -244,9 +259,9 @@ test/stats.e2e-spec.ts                             (e2e)
 
 ---
 
-## 9. Estado de implementación (Ejecutado: auth, clients, loans, guarantees, dashboard, stats, cron)
+## 9. Estado de implementación (Ejecutado: auth, users, business-config, clients, loans, guarantees, dashboard, stats, cron)
 
-Unit y E2E de `auth`, `clients`, `loans` y `guarantees` implementados y en verde. Tests unitarios del dominio y casos de uso del módulo `loans` (Clean Architecture). Tests unitarios de `dashboard`, `stats` y `cron`. El E2E de `loans` cubre la creación automática/manual, simulación, detalle y cuotas; el de `guarantees` cubre el CRUD y el ciclo AVAILABLE → IN_USE → AVAILABLE al vincular a un préstamo.
+Unit y E2E de `auth`, `clients`, `loans` y `guarantees` implementados y en verde. Tests unitarios del dominio y casos de uso del módulo `loans` (Clean Architecture). Tests unitarios de `users`, `business-config`, `dashboard`, `stats` y `cron`. El E2E de `loans` cubre la creación automática/manual, simulación, detalle y cuotas; el de `guarantees` cubre el CRUD y el ciclo AVAILABLE → IN_USE → AVAILABLE al vincular a un préstamo.
 
 | Id | Qué | Archivos | Estado |
 |----|-----|----------|--------|
@@ -265,8 +280,10 @@ Unit y E2E de `auth`, `clients`, `loans` y `guarantees` implementados y en verde
 | 13 | Unit `stats` (StatsService) | `src/modules/stats/stats.service.spec.ts` | ✅ |
 | 14 | Unit `cron` (OverdueProcessorService) | `src/modules/cron/services/overdue-processor.service.spec.ts` | ✅ |
 | 15 | Verificación general | — | ✅ |
+| 16 | Unit `users` (UsersService) | `src/modules/users/users.service.spec.ts` | ✅ |
+| 17 | Unit `business-config` (BusinessConfigService) | `src/modules/business-config/business-config.service.spec.ts` | ✅ |
 
-**Resultado:** `147` tests unit + `48` tests E2E en verde (17 spec files). Cobertura del dominio de `loans` cercana al 100%.
+**Resultado:** `pnpm test` → `163` tests en verde (`19` spec files). Cobertura del dominio de `loans` cercana al 100%. Las suites E2E viven en `test/` (`auth`, `clients`, `loans`, `guarantees`).
 
 ---
 

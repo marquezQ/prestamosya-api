@@ -9,7 +9,7 @@ Documento de arquitectura del backend. Describe la estructura de carpetas, el pa
 ```
 src/
   modules/
-    auth/                          ← estándar NestJS
+    auth/                          ← estándar NestJS (SOLO autenticación: quién soy)
       auth.module.ts
       auth.controller.ts
       auth.service.ts
@@ -28,6 +28,27 @@ src/
       strategies/
         jwt.strategy.ts
         jwt.strategy.spec.ts
+
+    users/                         ← estándar NestJS (mi cuenta / self-service)
+      users.module.ts
+      users.controller.ts
+      users.service.ts
+      users.service.spec.ts
+      users.docs.ts
+      dto/
+        user-response.dto.ts
+        update-profile.dto.ts
+        change-password.dto.ts
+
+    business-config/               ← estándar NestJS (dominio propio, 1:1 con User)
+      business-config.module.ts
+      business-config.controller.ts
+      business-config.service.ts
+      business-config.service.spec.ts
+      business-config.docs.ts
+      dto/
+        business-config-response.dto.ts
+        update-business-config.dto.ts
 
     clients/                       ← estándar NestJS
       clients.module.ts
@@ -200,6 +221,12 @@ src/
 ```
 
 Todas las rutas requieren JWT excepto las marcadas con `@Public()` (actualmente solo `POST /api/auth/login`).
+
+> **Separación de responsabilidades por módulo:**
+> - `auth` = **autenticación** (quién soy): login, token JWT, guards, estrategias, decoradores.
+> - `users` = **mi cuenta** (self-service): `GET/PATCH /users/me`, `PATCH /users/me/password`. Aquí vivirán las rutas de administración del super admin (`/users/:id`).
+> - `business-config` = **dominio propio** (config 1:1 con User): `GET/PATCH /business-config`.
+> - No mezclar dominios en `auth`: si una operación es "sobre mi usuario/cuenta" va a `users`; si es la config del negocio, va a `business-config`.
 
 ---
 
