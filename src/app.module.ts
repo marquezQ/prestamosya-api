@@ -4,6 +4,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { AuthModule } from './modules/auth/auth.module';
+import { UsersModule } from './modules/users/users.module';
+import { BusinessConfigModule } from './modules/business-config/business-config.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { LoansModule } from './modules/loans/loans.module';
 import { GuaranteesModule } from './modules/guarantees/guarantees.module';
@@ -19,6 +21,8 @@ import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
     PrismaModule,
     CloudinaryModule,
     AuthModule,
+    UsersModule,
+    BusinessConfigModule,
     ClientsModule,
     LoansModule,
     GuaranteesModule,

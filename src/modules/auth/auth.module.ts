@@ -1,3 +1,4 @@
+// src/modules/auth/auth.module.ts
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -6,6 +7,13 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
+/**
+ * Módulo de AUTENTICACIÓN (auth = "quién soy", no "qué hago con mi cuenta").
+ *
+ * Contiene: login/logout/me, estrategias JWT, guards y decoradores de
+ * seguridad. La CUENTA del usuario (perfil, contraseña) vive en UsersModule
+ * y la configuración del negocio en BusinessConfigModule.
+ */
 @Module({
   imports: [
     // Configuración base de Passport para JWT

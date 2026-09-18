@@ -74,7 +74,7 @@ describe('GetHomeDashboardUseCase', () => {
           {
             id: 'inst-3',
             installmentNumber: 1,
-            dueDate: new Date('2026-09-10'),
+            dueDate: new Date('2027-09-10'),
             capitalAmount: 1000,
             interestAmount: 50,
             totalAmount: 1050,

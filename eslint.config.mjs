@@ -29,7 +29,12 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'warn',
       '@typescript-eslint/no-unsafe-argument': 'warn',
-      "prettier/prettier": "error",
+      // Los mocks de Jest (jest.Mock sin genéricos) producen tipos `any` en sus
+      // métodos (.mockResolvedValue, etc.). Bajar a warn es consistente con
+      // no-unsafe-argument, ya aplicado por la misma razón.
+      '@typescript-eslint/no-unsafe-call': 'warn',
+      '@typescript-eslint/no-unsafe-member-access': 'warn',
+      'prettier/prettier': 'error',
     },
   },
 );
