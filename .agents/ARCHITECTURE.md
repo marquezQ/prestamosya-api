@@ -156,11 +156,14 @@ src/
       dto/
         home-dashboard-response.dto.ts
 
-    stats/                         ← estándar NestJS
+    stats/                         ← estándar NestJS + SRP PdfBuilderService
       stats.module.ts
       stats.controller.ts
       stats.service.ts
       stats.service.spec.ts
+      pdf-builder.service.ts       ← Servicio especializado de generación de PDF con pdfmake (Carta/Landscape)
+      pdf-builder.types.ts         ← Tipos, interfaces y constantes del sistema de diseño del PDF
+      pdf-formatter.utils.ts       ← Funciones puras de formateo financiero, cálculo de mora y fechas
       stats.docs.ts
       dto/
         monthly-stats-response.dto.ts

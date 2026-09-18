@@ -161,3 +161,19 @@ Para la creación de préstamos (formulario de 3 pasos) el frontend DEBE respeta
 - Todos los montos: `Decimal` con **2 decimales**
 - La diferencia de centavos por redondeo va en la **última cuota**
 - La suma de todas las cuotas debe ser **exactamente igual** a `loan.totalAmount`
+
+---
+
+## Reportes en PDF (Balance de Pagos y Ganancias Mensual)
+
+- **Generador**: `PdfBuilderService` (`pdfmake` server-side con fuentes Roboto nativas).
+- **Formato**: Hoja Carta (`LETTER`) en orientación horizontal (`Landscape`), optimizado para lectura ejecutiva.
+- **Inmutabilidad Histórica de Cobertura de Pago**:
+  - Cada transacción de pago se evalúa en función del monto aplicado en **esa operación específica** (`capitalPaid + interestPaid < installmentTotal` → `Abono Parcial`, `== installmentTotal` → `Completo`).
+  - No depende del estado actual en vivo de la cuota en la base de datos, garantizando que reportes históricos de meses pasados permanezcan inmutables ante pagos futuros.
+- **Alerta Visual de Retraso**:
+  - Si `paymentDate > dueDate`, la celda de `F. Pago` se destaca en texto **rojo negrita** con el indicador del número de días de mora.
+- **Resumen Ejecutivo por Moneda**:
+  - Destaca en tarjeta verde la **Ganancia Bruta a Intereses** del mes.
+  - Presenta la comparativa de actividad: `Capital Recuperado`, `Total Ingresos en Efectivo`, `Nuevos Créditos Prestados` y `Flujo Neto del Mes`.
+
