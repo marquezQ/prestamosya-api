@@ -184,6 +184,7 @@ GET    /api/dashboard/home       → HomeDashboardResponseDto { capitalEnCalle: 
 ```
 GET  /api/stats/monthly?year=2026&month=9   → MonthlyStatsResponseDto
 GET  /api/stats/monthly-history?months=6   → MonthlyHistoryItemDto[]
+GET  /api/stats/monthly-pdf?year=2026&month=9 → Buffer (binary application/pdf)
 ```
 
 > **`GET /api/stats/monthly`:** Reporte financiero completo del mes consultado. Incluye 5 secciones:
@@ -196,6 +197,16 @@ GET  /api/stats/monthly-history?months=6   → MonthlyHistoryItemDto[]
 > Si `year` y `month` se omiten, devuelve el mes en curso según `America/La_Paz`.
 
 > **`GET /api/stats/monthly-history`:** Historial resumido de los últimos N meses para renderizar gráficas de barras o líneas en el frontend. **El arreglo se entrega en orden cronológico** (índice 0 = mes más antiguo, último índice = mes actual), listo para plotear de izquierda a derecha en el eje X. Cada ítem incluye: `interestCollected`, `netProfit`, `collectionRate` y `newLoansCount`. Opcional: `?months=6` (por defecto 6, máximo 24).
+
+> **`GET /api/stats/monthly-pdf`:** Genera y devuelve el reporte oficial en formato PDF del balance de pagos y ganancias del mes.
+> - **Formato**: Hoja Carta (`LETTER`) en orientación horizontal (`Landscape`).
+> - **Respuesta**: Stream binario `application/pdf` con header `Content-Disposition: attachment; filename="balance-pagos-YYYY-MM.pdf"`.
+> - **CORS**: Header expuesto `Access-Control-Expose-Headers: Content-Disposition` para Next.js y React Native Expo (`expo-file-system`).
+> - **Contenido**:
+>   - Tabla de 11 columnas con cada transacción de pago del mes (`#`, `Cliente`, `Cap. Crédito`, `Cuota N°/Total`, `F. Venc.`, `F. Pago`, `Cobertura [Completo/Abono Parcial]`, `Tasa/Mod.`, `Pagado`, `A Capital`, `A Interés`).
+>   - **Alertas**: Si `F. Pago > F. Venc.`, la fecha se destaca en rojo negrita.
+>   - **Cuadro Ejecutivo**: Resumen de ganancias a interés destacadas y comparación con los indicadores mensuales de stats (`interestCollected`, `capitalRecovered`, `totalCashIn`, `newLoansCapital`, `netProfit`).
+
 
 
 ## Admin

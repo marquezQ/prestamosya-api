@@ -10,6 +10,8 @@ import * as path from 'path';
 /** Contrato para la instancia principal de pdfmake en Node.js */
 export interface PdfMakeInstance {
   fonts: TFontDictionary;
+  setUrlAccessPolicy(callback?: (url: string) => boolean): void;
+  setLocalAccessPolicy(callback?: (path: string) => boolean): void;
   createPdf(docDefinition: object): {
     getBuffer(): Promise<Buffer>;
   };
@@ -24,6 +26,8 @@ export interface PdfMakeInstance {
 export interface PaymentRow {
   /** Número de la cuota del cronograma */
   installmentNumber: number;
+  /** Total de cuotas del plan de pagos (para formato '2/10') */
+  totalInstallments: number;
   /** Monto total de la cuota según el cronograma */
   installmentTotal: number;
   /** Capital total original del préstamo (para identificar de qué crédito es) */
@@ -46,6 +50,8 @@ export interface PaymentRow {
   paymentDate: Date;
   /** Días de retraso (0 si pagó a tiempo o antes) */
   delayDays: number;
+  /** Indica si fue un abono parcial (true) o el pago completo de la cuota (false) */
+  isPartial: boolean;
 }
 
 /** Resumen de métricas de rendimiento y balance del mes. */
@@ -106,10 +112,6 @@ export const COLOR = {
   profitBg: '#e6f4ea',
   profitText: '#137333',
   profitBorder: '#a8dab5',
-  onTimeBg: '#e6f4ea',
-  onTimeText: '#137333',
-  delayedBg: '#fce8e6',
-  delayedText: '#c5221f',
   kpiBg: '#f1f5f9',
 } as const;
 

@@ -25,6 +25,9 @@ const pdfmake: PdfMakeInstance = require('pdfmake');
 export class PdfBuilderService {
   constructor() {
     pdfmake.fonts = ROBOTO_FONTS;
+    // Definir políticas de acceso para silenciar advertencias de seguridad en pdfmake 0.3.x
+    pdfmake.setUrlAccessPolicy?.(() => false);
+    pdfmake.setLocalAccessPolicy?.(() => true);
   }
 
   /**
@@ -247,7 +250,7 @@ export class PdfBuilderService {
       h('Cuota', 'center'),
       h('F. Venc.', 'center'),
       h('F. Pago', 'center'),
-      h('Puntualidad', 'center'),
+      h('Cobertura', 'center'),
       h('Tasa / Mod.', 'center'),
       h(`Pagado (${symbol})`, 'right'),
       h(`A Capital (${symbol})`, 'right'),
@@ -277,16 +280,15 @@ export class PdfBuilderService {
         ...extraStyle,
       });
 
-      // Badge de estado de puntualidad
-      const isOnTime = row.delayDays === 0;
-      const statusText = isOnTime ? '✓ En fecha' : `+${row.delayDays}d Retraso`;
-      const statusCell = {
-        text: statusText,
+      // Badge de Cobertura (Completo vs Abono Parcial)
+      const coverageText = row.isPartial ? 'Abono Parcial' : 'Completo';
+      const coverageCell = {
+        text: coverageText,
         alignment: 'center' as const,
-        fontSize: 7.5,
+        fontSize: 7,
         bold: true,
-        color: isOnTime ? COLOR.onTimeText : COLOR.delayedText,
-        fillColor: isOnTime ? COLOR.onTimeBg : COLOR.delayedBg,
+        color: row.isPartial ? '#b45309' : '#1d4ed8',
+        fillColor: row.isPartial ? '#fef3c7' : '#eff6ff',
         border: BORDER.BOTTOM,
         borderColor: [
           COLOR.borderColor,
@@ -296,14 +298,21 @@ export class PdfBuilderService {
         ],
       };
 
+      // Alerta visual en rojo si la fecha de pago fue posterior al vencimiento
+      const isLatePayment = row.delayDays > 0;
+      const paymentDateCell = cell(fmtShortDate(row.paymentDate), 'center', {
+        bold: isLatePayment,
+        color: isLatePayment ? '#c5221f' : '#2d3748',
+      });
+
       return [
         cell(String(idx + 1), 'center'),
         cell(truncate(row.clientName, 18)),
         cell(fmt(row.loanCapital), 'right'),
-        cell(String(row.installmentNumber), 'center'),
+        cell(`${row.installmentNumber}/${row.totalInstallments}`, 'center'),
         cell(fmtShortDate(row.dueDate), 'center'),
-        cell(fmtShortDate(row.paymentDate), 'center'),
-        statusCell,
+        paymentDateCell,
+        coverageCell,
         cell(fmtRate(row.interestRate, row.periodType), 'center'),
         cell(fmt(row.amountPaid), 'right'),
         cell(fmt(row.capitalPaid), 'right'),
@@ -432,7 +441,7 @@ export class PdfBuilderService {
                                       marginTop: 2,
                                     },
                                     {
-                                      text: `Total acumulado a través de ${rowsCount(rowsCountLabel(totals))} pagos cobrados en el mes`,
+                                      text: `Total de ganancias por intereses cobrados en el mes`,
                                       fontSize: 7,
                                       color: '#4a5568',
                                       alignment: 'center',
@@ -563,12 +572,4 @@ export class PdfBuilderService {
       footer: { fontSize: 7, color: '#a0aec0' },
     };
   }
-}
-
-function rowsCountLabel(totals: RowTotals): number {
-  return totals.amountPaid > 0 ? 1 : 0;
-}
-
-function rowsCount(val: number): string {
-  return val > 0 ? 'los' : '0';
 }

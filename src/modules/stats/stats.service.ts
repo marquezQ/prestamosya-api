@@ -234,6 +234,7 @@ export class StatsService {
             capitalAmount: true,
             interestRate: true,
             periodType: true,
+            totalInstallments: true,
             client: { select: { fullName: true } },
           },
         },
@@ -246,6 +247,8 @@ export class StatsService {
                 installmentNumber: true,
                 totalAmount: true,
                 dueDate: true,
+                status: true,
+                paidAmount: true,
               },
             },
           },
@@ -278,6 +281,7 @@ export class StatsService {
           clientName: payment.loan.client.fullName,
           loanCapital: Number(payment.loan.capitalAmount),
           installmentNumber: link.installment.installmentNumber,
+          totalInstallments: payment.loan.totalInstallments,
           installmentTotal: Number(link.installment.totalAmount),
           interestRate: Number(payment.loan.interestRate),
           periodType: payment.loan.periodType,
@@ -287,6 +291,9 @@ export class StatsService {
           dueDate,
           paymentDate,
           delayDays,
+          isPartial:
+            Number(link.capitalPaid ?? 0) + Number(link.interestPaid ?? 0) <
+            Number(link.installment.totalAmount),
         };
         targetRows.push(row);
       }
