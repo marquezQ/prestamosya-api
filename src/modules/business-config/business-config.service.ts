@@ -95,8 +95,10 @@ export class BusinessConfigService {
     id: string;
     businessName: string | null;
     primaryCurrency: 'BOB' | 'USD';
-    exchangeRate: unknown;
-    defaultInterestRate: unknown;
+    /** Decimal de Prisma — compatible con cualquier tipo que implemente toString() */
+    exchangeRate: { toString(): string };
+    /** Decimal de Prisma — null si aún no se ha configurado */
+    defaultInterestRate: { toString(): string } | null;
     defaultPeriodType:
       | 'daily'
       | 'weekly'

@@ -2,25 +2,27 @@
 import {
   BadRequestException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
-import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 
 /**
  * Módulo de CUENTA de usuario (self-service): operaciones sobre MI usuario.
  *
- * Separa la cuenta del usuario de la autenticación: `auth` se encarga de
- * quién soy (login, token, guards); `users` se encarga de mantener mi
- * perfil y mis credenciales.
+ * Responsabilidades actuales:
+ * - GET  /users/me           → perfil fresco desde BD
+ * - PATCH /users/me/password → cambiar mi contraseña (requiere actual)
+ *
+ * Decisión de diseño: el nombre del usuario NO es editable por él mismo.
+ * Lo gestiona el super admin vía PATCH /users/:id (futuro). El nombre
+ * lo establece el super admin al crear la cuenta a petición del cliente.
  *
  * Aquí vivirán también las operaciones que el super admin hará sobre otros
- * prestamistas (crear, listar, deshabilitar, reset de contraseña) — campos
- * `:id` reutilizando las mismas reglas de seguridad (el `select` nunca
- * expone el `passwordHash`).
+ * prestamistas (crear, listar, deshabilitar, reset de contraseña).
  */
 @Injectable()
 export class UsersService {
@@ -45,36 +47,10 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Credenciales inválidas');
+      throw new NotFoundException('Usuario no encontrado');
     }
 
     return user;
-  }
-
-  /**
-   * Actualiza el perfil del usuario autenticado.
-   *
-   * Solo el campo `name` es editable (el `username` no). Devuelve los datos
-   * frescos del usuario para que el frontend actualice su estado local.
-   */
-  async updateProfile(
-    userId: string,
-    dto: UpdateProfileDto,
-  ): Promise<UserResponseDto> {
-    // `select` garantiza que NUNCA se devuelva el passwordHash.
-    return this.prisma.user.update({
-      where: { id: userId },
-      data: { name: dto.name },
-      select: {
-        id: true,
-        name: true,
-        username: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
   }
 
   /**
@@ -94,6 +70,7 @@ export class UsersService {
     });
 
     if (!user) {
+      // Token válido pero usuario eliminado — tratar como no autorizado.
       throw new UnauthorizedException('Credenciales inválidas');
     }
 

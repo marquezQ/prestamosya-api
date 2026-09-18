@@ -37,7 +37,7 @@ src/
       users.docs.ts
       dto/
         user-response.dto.ts
-        update-profile.dto.ts
+        update-profile.dto.ts    ← reservado para PATCH /users/:id (super admin, futuro)
         change-password.dto.ts
 
     business-config/               ← estándar NestJS (dominio propio, 1:1 con User)
@@ -224,7 +224,9 @@ Todas las rutas requieren JWT excepto las marcadas con `@Public()` (actualmente 
 
 > **Separación de responsabilidades por módulo:**
 > - `auth` = **autenticación** (quién soy): login, token JWT, guards, estrategias, decoradores.
-> - `users` = **mi cuenta** (self-service): `GET/PATCH /users/me`, `PATCH /users/me/password`. Aquí vivirán las rutas de administración del super admin (`/users/:id`).
+> - `users` = **mi cuenta** (self-service): `GET /users/me`, `PATCH /users/me/password`.
+>   - `PATCH /users/me` (editar nombre) **NO existe**: el nombre lo establece el super admin al crear la cuenta
+>     y lo editará vía `PATCH /users/:id` (futuro). `update-profile.dto.ts` se mantiene para ese uso.
 > - `business-config` = **dominio propio** (config 1:1 con User): `GET/PATCH /business-config`.
 > - No mezclar dominios en `auth`: si una operación es "sobre mi usuario/cuenta" va a `users`; si es la config del negocio, va a `business-config`.
 

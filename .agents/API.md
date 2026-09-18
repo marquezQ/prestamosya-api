@@ -26,11 +26,15 @@ POST   /api/auth/logout          → { message }                        [protegi
 
 ```
 GET    /api/users/me               → UserResponseDto (perfil fresco desde la BD)
-PATCH  /api/users/me               → UserResponseDto (solo `name` es editable)
 PATCH  /api/users/me/password      → { message } (requiere la contraseña actual)
 ```
 
-> **Separación de responsabilidades:** `auth` = autenticación ("quién soy"); `users` = cuenta del usuario ("mantener mi perfil y contraseña"). Las rutas de administración del super admin (`GET/POST /users`, `PATCH /users/:id`, `POST /users/:id/reset-password`) se agregarán aquí en el futuro.
+> **Separación de responsabilidades:** `auth` = autenticación ("quién soy"); `users` = cuenta del usuario.
+> **Decisión:** `PATCH /users/me` (editar nombre propio) no existe. El nombre lo establece el super admin al crear
+> la cuenta a petición del cliente y lo editará vía `PATCH /users/:id` (futuro). El usuario autenticado solo puede
+> consultar su perfil (`GET /users/me`) y cambiar su contraseña (`PATCH /users/me/password`).
+> Las rutas de administración del super admin (`GET/POST /users`, `PATCH /users/:id`, `POST /users/:id/reset-password`)
+> se agregarán aquí en el futuro.
 
 ---
 

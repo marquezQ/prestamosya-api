@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 
 // `bcrypt.compare` y `bcrypt.hash` no son re-reescribibles con spyOn,
@@ -17,8 +17,11 @@ import { createPrismaMock, prismaServiceOf } from '../../testing/prisma.mock';
 
 /**
  * Unit tests de UsersService (cuenta de usuario / self-service): prueba
- * getProfile, updateProfile y changePassword con mocks (Prisma/bcrypt),
- * sin BD. Cubre la seguridad (nunca filtrar passwordHash) y los errores.
+ * getProfile y changePassword con mocks (Prisma/bcrypt), sin BD.
+ * Cubre la seguridad (nunca filtrar passwordHash) y los errores.
+ *
+ * PATCH /users/me (updateProfile) fue eliminado: el nombre del usuario
+ * lo gestiona el super admin vía PATCH /users/:id.
  */
 describe('UsersService', () => {
   let service: UsersService;
@@ -98,59 +101,12 @@ describe('UsersService', () => {
       expect(result).not.toHaveProperty('passwordHash');
     });
 
-    it('lanza UnauthorizedException si el usuario no existe', async () => {
+    it('lanza NotFoundException si el usuario no existe', async () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
 
       await expect(service.getProfile('user-1')).rejects.toThrow(
-        UnauthorizedException,
+        NotFoundException,
       );
-    });
-  });
-
-  describe('updateProfile()', () => {
-    it('actualiza solo el nombre con el userId y devuelve datos frescos', async () => {
-      prismaMock.user.update.mockResolvedValue({
-        ...baseUser,
-        name: 'Nuevo Nombre',
-      });
-
-      const result = await service.updateProfile('user-1', {
-        name: 'Nuevo Nombre',
-      });
-
-      expect(prismaMock.user.update).toHaveBeenCalledWith({
-        where: { id: 'user-1' },
-        data: { name: 'Nuevo Nombre' },
-        select: {
-          id: true,
-          name: true,
-          username: true,
-          role: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
-      expect(result.name).toBe('Nuevo Nombre');
-    });
-
-    it('nunca devuelve passwordHash en la respuesta', async () => {
-      // El mock resuelve el resultado del `select` (que omite passwordHash).
-      prismaMock.user.update.mockResolvedValue({
-        id: 'user-1',
-        name: 'Nuevo Nombre',
-        username: 'admin',
-        role: 'admin',
-        isActive: true,
-        createdAt: new Date('2026-01-01T00:00:00.000Z'),
-        updatedAt: new Date('2026-01-01T00:00:00.000Z'),
-      });
-
-      const result = await service.updateProfile('user-1', {
-        name: 'Nuevo Nombre',
-      });
-
-      expect(result).not.toHaveProperty('passwordHash');
     });
   });
 
