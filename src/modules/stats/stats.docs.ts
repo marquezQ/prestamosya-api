@@ -1,5 +1,10 @@
 import { applyDecorators } from '@nestjs/common';
-import { ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiProduces,
+  ApiQuery,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { MonthlyStatsResponseDto } from './dto/monthly-stats-response.dto';
 import { MonthlyHistoryItemDto } from './dto/monthly-history-response.dto';
 
@@ -59,6 +64,54 @@ export function ApiGetMonthlyHistoryDoc() {
       status: 200,
       description: 'Historial mensual generado exitosamente',
       type: [MonthlyHistoryItemDto],
+    }),
+  );
+}
+
+export function ApiGetMonthlyPdfDoc() {
+  return applyDecorators(
+    ApiOperation({
+      summary: 'PDF: Balance de pagos mensual',
+      description:
+        'Genera y descarga un PDF con el detalle de todos los pagos del mes. ' +
+        'Incluye 9 columnas: #, Cliente, Monto Préstamo, Total Cuota, N° Cuota, ' +
+        'Tasa/Modalidad, Pagado, A Capital y A Interés. ' +
+        'Al final de cada tabla (BOB / USD por separado) se muestran las sumatorias ' +
+        'que deben coincidir con los campos de incomeBreakdown de GET /api/stats/monthly. ' +
+        'Compatible con Next.js (fetch → blob) y React Native Expo (FileSystem.downloadAsync).',
+    }),
+    ApiProduces('application/pdf'),
+    ApiQuery({
+      name: 'year',
+      required: false,
+      type: Number,
+      example: 2026,
+      description: 'Año del período. Default: año actual.',
+    }),
+    ApiQuery({
+      name: 'month',
+      required: false,
+      type: Number,
+      example: 9,
+      description: 'Mes del período (1-12). Default: mes actual.',
+    }),
+    ApiResponse({
+      status: 200,
+      description: 'PDF generado exitosamente',
+      headers: {
+        'Content-Type': {
+          description: 'application/pdf',
+          schema: { type: 'string' },
+        },
+        'Content-Disposition': {
+          description: 'attachment; filename="balance-pagos-YYYY-MM.pdf"',
+          schema: { type: 'string' },
+        },
+      },
+    }),
+    ApiResponse({
+      status: 400,
+      description: 'Parámetros inválidos (year/month fuera de rango)',
     }),
   );
 }

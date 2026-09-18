@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StatsService } from './stats.service';
+import { PdfBuilderService } from './pdf-builder.service';
 
 /**
  * Tests unitarios del StatsService.
@@ -25,11 +26,18 @@ describe('StatsService', () => {
     client: { count: jest.fn() },
   };
 
+  // Mock mínimo de PdfBuilderService — los tests existentes no ejercitan
+  // el método generateMonthlyPaymentsPdf, solo validan la lógica financiera.
+  const mockPdfBuilder = {
+    buildMonthlyPaymentsPdf: jest.fn().mockResolvedValue(Buffer.alloc(0)),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StatsService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: PdfBuilderService, useValue: mockPdfBuilder },
       ],
     }).compile();
 

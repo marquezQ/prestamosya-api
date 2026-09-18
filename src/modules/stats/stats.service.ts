@@ -10,6 +10,8 @@ import {
   RiskIndicatorsDto,
 } from './dto/monthly-stats-response.dto';
 import { MonthlyHistoryItemDto } from './dto/monthly-history-response.dto';
+import { MonthlyPaymentsPdfData, PaymentRow } from './pdf-builder.types';
+import { PdfBuilderService } from './pdf-builder.service';
 
 /**
  * Resultado interno de la división de un pago entre interés y capital.
@@ -68,7 +70,10 @@ const MONTH_SHORT_ES = [
 
 @Injectable()
 export class StatsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pdfBuilder: PdfBuilderService,
+  ) {}
 
   // ─── API Pública ────────────────────────────────────────────────────────────
 
@@ -178,6 +183,156 @@ export class StatsService {
 
     // Retorna ordenado cronológicamente: [mes_más_antiguo, ..., mes_actual]
     return results;
+  }
+
+  // ─── PDF — Balance de Pagos Mensual ─────────────────────────────────────────
+
+  /**
+   * Genera el PDF de balance de pagos del mes consultado y devuelve un Buffer
+   * listo para enviarse como `application/pdf` al frontend (Next.js) o mobile
+   * (React Native Expo via expo-file-system).
+   *
+   * Los totales del PDF (Σ pagado, Σ capital, Σ interés) deben coincidir con
+   * los campos de `incomeBreakdown` del endpoint GET /api/stats/monthly
+   * para la misma moneda y período, lo que permite auditar visualmente
+   * la exactitud de los datos que muestra la aplicación.
+   *
+   * Compatibilidad:
+   *   - Next.js: fetch() → response.blob() → URL.createObjectURL(blob)
+   *   - React Native Expo: FileSystem.downloadAsync() con headers Authorization
+   */
+  async generateMonthlyPaymentsPdf(
+    userId: string,
+    year: number,
+    month: number,
+  ): Promise<Buffer> {
+    const { startOfMonth, endOfMonth } = this._getMonthBounds(year, month);
+
+    // Obtener el nombre del usuario para el encabezado del PDF
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+
+    // Obtener también el resumen de estadísticas del mes para el PDF
+    const monthlyStats = await this.getMonthlyStats(userId, year, month);
+
+    // Traer todos los pagos no anulados del mes con el desglose por cuota.
+    // Incluye datos del préstamo y del cliente para identificar de qué crédito es.
+    const payments = await this.prisma.payment.findMany({
+      where: {
+        loan: { createdBy: userId },
+        voided: false,
+        paymentDate: { gte: startOfMonth, lt: endOfMonth },
+      },
+      select: {
+        paymentDate: true,
+        amount: true,
+        loan: {
+          select: {
+            currency: true,
+            capitalAmount: true,
+            interestRate: true,
+            periodType: true,
+            client: { select: { fullName: true } },
+          },
+        },
+        installmentLinks: {
+          select: {
+            interestPaid: true,
+            capitalPaid: true,
+            installment: {
+              select: {
+                installmentNumber: true,
+                totalAmount: true,
+                dueDate: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { paymentDate: 'asc' },
+    });
+
+    // Aplanar pagos × cuotas en filas individuales, separadas por moneda.
+    // Cada PaymentInstallment origina una fila en la tabla del PDF.
+    const rowsBOB: PaymentRow[] = [];
+    const rowsUSD: PaymentRow[] = [];
+
+    for (const payment of payments) {
+      const currency = payment.loan.currency;
+      const targetRows = currency === 'BOB' ? rowsBOB : rowsUSD;
+
+      for (const link of payment.installmentLinks) {
+        const dueDate = link.installment.dueDate;
+        const paymentDate = payment.paymentDate;
+        const dueMs = new Date(dueDate).setHours(0, 0, 0, 0);
+        const paidMs = new Date(paymentDate).setHours(0, 0, 0, 0);
+        const diffMs = paidMs - dueMs;
+        const delayDays = Math.max(
+          0,
+          Math.floor(diffMs / (1000 * 60 * 60 * 24)),
+        );
+
+        const row: PaymentRow = {
+          clientName: payment.loan.client.fullName,
+          loanCapital: Number(payment.loan.capitalAmount),
+          installmentNumber: link.installment.installmentNumber,
+          installmentTotal: Number(link.installment.totalAmount),
+          interestRate: Number(payment.loan.interestRate),
+          periodType: payment.loan.periodType,
+          amountPaid: Number(payment.amount),
+          capitalPaid: Number(link.capitalPaid ?? 0),
+          interestPaid: Number(link.interestPaid ?? 0),
+          dueDate,
+          paymentDate,
+          delayDays,
+        };
+        targetRows.push(row);
+      }
+    }
+
+    const MONTH_NAMES_ES_LOCAL = [
+      '',
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre',
+    ];
+
+    const data: MonthlyPaymentsPdfData = {
+      userName: user?.name ?? 'Usuario',
+      year,
+      month,
+      periodLabel: `${MONTH_NAMES_ES_LOCAL[month]} ${year}`,
+      rowsBOB,
+      rowsUSD,
+      statsSummary: {
+        interestCollectedBOB:
+          monthlyStats.incomeBreakdown.interestCollected.BOB,
+        interestCollectedUSD:
+          monthlyStats.incomeBreakdown.interestCollected.USD,
+        capitalRecoveredBOB: monthlyStats.incomeBreakdown.capitalRecovered.BOB,
+        capitalRecoveredUSD: monthlyStats.incomeBreakdown.capitalRecovered.USD,
+        totalCashInflowBOB: monthlyStats.incomeBreakdown.totalCashIn.BOB,
+        totalCashInflowUSD: monthlyStats.incomeBreakdown.totalCashIn.USD,
+        newCapitalLentBOB: monthlyStats.riskIndicators.newLoansCapital.BOB,
+        newCapitalLentUSD: monthlyStats.riskIndicators.newLoansCapital.USD,
+        netCashFlowBOB: monthlyStats.monthlyBalance.netProfit.BOB,
+        netCashFlowUSD: monthlyStats.monthlyBalance.netProfit.USD,
+        totalPaymentsCount: rowsBOB.length + rowsUSD.length,
+      },
+    };
+
+    return this.pdfBuilder.buildMonthlyPaymentsPdf(data);
   }
 
   // ─── Métodos privados de cómputo ────────────────────────────────────────────
