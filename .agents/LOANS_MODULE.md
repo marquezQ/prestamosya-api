@@ -77,7 +77,7 @@ La primera etapa de construcción estableció los cimientos y el flujo completo 
 - El cliente se marca `CURRENT` al crear su primer préstamo si estaba `NO_LOAN` (ver `create-loan.use-case.ts`).
 
 ### Testing de esta etapa
-- Se implementaron **147 tests unitarios aislados** (`17 test suites` en verde) verificando exhaustivamente: las lógicas de redondeo, sumas de `Money`, vinculación de garantías con chequeo de estado `IN_USE`, generación de respuestas de detalle, flujos de pago, liquidación anticipada, cron de mora y dashboard de pagos.
+- Se implementaron **172 tests unitarios aislados** (`20 test suites` en verde) verificando exhaustivamente: las lógicas de redondeo, sumas de `Money`, vinculación de garantías con chequeo de estado `IN_USE`, generación de respuestas de detalle, flujos de pago, liquidación anticipada, cron de mora y dashboard de pagos.
 
 ---
 
@@ -111,7 +111,7 @@ Las siguientes fases deben desarrollarse para dar por concluido completamente el
 - **Simulación y Creación**: Soporte completo en `POST /api/loans/simulate` y `POST /api/loans` pasando `scheduleType: 'INTEREST_ONLY'`. Es opcional; si se omite, asume `EQUAL_INSTALLMENTS` para retrocompatibilidad total.
 
 ### Testing del Módulo
-- Se cuenta con **147 tests unitarios aislados** (`17 test suites` en verde) verificando recálculo diario, idempotencia, estados de cliente, flujo de mora, liquidación anticipada, cálculo de cronogramas `INTEREST_ONLY` y dashboard de pagos.
+- Se cuenta con **172 tests unitarios aislados** (`20 test suites` en verde) verificando recálculo diario, idempotencia, estados de cliente, flujo de mora, liquidación anticipada, cálculo de cronogramas `INTEREST_ONLY` y dashboard de pagos.
 
 ---
 

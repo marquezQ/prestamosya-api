@@ -12,8 +12,8 @@ import {
 import {
   computeTotals,
   fmt,
+  fmtDateColumn,
   fmtRate,
-  fmtShortDate,
   fmtTodayLaPaz,
   truncate,
 } from './pdf-formatter.utils';
@@ -129,11 +129,6 @@ export class PdfBuilderService {
             { text: 'PrestamosYA', style: 'brandName', alignment: 'right' },
             {
               text: `Generado: ${fmtTodayLaPaz()}`,
-              style: 'docMeta',
-              alignment: 'right',
-            },
-            {
-              text: `Formato: Carta (Landscape)`,
               style: 'docMeta',
               alignment: 'right',
             },
@@ -300,7 +295,7 @@ export class PdfBuilderService {
 
       // Alerta visual en rojo si la fecha de pago fue posterior al vencimiento
       const isLatePayment = row.delayDays > 0;
-      const paymentDateCell = cell(fmtShortDate(row.paymentDate), 'center', {
+      const paymentDateCell = cell(fmtDateColumn(row.paymentDate), 'center', {
         bold: isLatePayment,
         color: isLatePayment ? '#c5221f' : '#2d3748',
       });
@@ -310,7 +305,7 @@ export class PdfBuilderService {
         cell(truncate(row.clientName, 18)),
         cell(fmt(row.loanCapital), 'right'),
         cell(`${row.installmentNumber}/${row.totalInstallments}`, 'center'),
-        cell(fmtShortDate(row.dueDate), 'center'),
+        cell(fmtDateColumn(row.dueDate), 'center'),
         paymentDateCell,
         coverageCell,
         cell(fmtRate(row.interestRate, row.periodType), 'center'),

@@ -221,7 +221,7 @@ export class StatsService {
     // Incluye datos del préstamo y del cliente para identificar de qué crédito es.
     const payments = await this.prisma.payment.findMany({
       where: {
-        loan: { createdBy: userId },
+        loan: { createdBy: userId, client: { deletedAt: null } },
         voided: false,
         paymentDate: { gte: startOfMonth, lt: endOfMonth },
       },
@@ -239,6 +239,9 @@ export class StatsService {
           },
         },
         installmentLinks: {
+          where: {
+            installment: { archived: false },
+          },
           select: {
             interestPaid: true,
             capitalPaid: true,
@@ -269,13 +272,17 @@ export class StatsService {
       for (const link of payment.installmentLinks) {
         const dueDate = link.installment.dueDate;
         const paymentDate = payment.paymentDate;
-        const dueMs = new Date(dueDate).setHours(0, 0, 0, 0);
-        const paidMs = new Date(paymentDate).setHours(0, 0, 0, 0);
+        const dueMs = new Date(dueDate).setUTCHours(0, 0, 0, 0);
+        const paidMs = new Date(paymentDate).setUTCHours(0, 0, 0, 0);
         const diffMs = paidMs - dueMs;
         const delayDays = Math.max(
           0,
           Math.floor(diffMs / (1000 * 60 * 60 * 24)),
         );
+
+        const capitalPaid = Number(link.capitalPaid ?? 0);
+        const interestPaid = Number(link.interestPaid ?? 0);
+        const linkAmountPaid = capitalPaid + interestPaid;
 
         const row: PaymentRow = {
           clientName: payment.loan.client.fullName,
@@ -285,15 +292,13 @@ export class StatsService {
           installmentTotal: Number(link.installment.totalAmount),
           interestRate: Number(payment.loan.interestRate),
           periodType: payment.loan.periodType,
-          amountPaid: Number(payment.amount),
-          capitalPaid: Number(link.capitalPaid ?? 0),
-          interestPaid: Number(link.interestPaid ?? 0),
+          amountPaid: linkAmountPaid,
+          capitalPaid,
+          interestPaid,
           dueDate,
           paymentDate,
           delayDays,
-          isPartial:
-            Number(link.capitalPaid ?? 0) + Number(link.interestPaid ?? 0) <
-            Number(link.installment.totalAmount),
+          isPartial: linkAmountPaid < Number(link.installment.totalAmount),
         };
         targetRows.push(row);
       }
@@ -367,7 +372,7 @@ export class StatsService {
     // Ordenados por paymentDate ASC para procesar en orden cronológico.
     const payments = await this.prisma.payment.findMany({
       where: {
-        loan: { createdBy: userId },
+        loan: { createdBy: userId, client: { deletedAt: null } },
         voided: false,
         paymentDate: { gte: startOfMonth, lt: endOfMonth },
       },
@@ -375,6 +380,9 @@ export class StatsService {
         discountAmount: true,
         loan: { select: { currency: true } },
         installmentLinks: {
+          where: {
+            installment: { archived: false },
+          },
           select: {
             interestPaid: true,
             capitalPaid: true,

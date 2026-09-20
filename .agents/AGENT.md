@@ -39,9 +39,9 @@ Este repositorio es exclusivamente el backend. El frontend vive en `prestamosya-
 
 5. **Usar `prisma.$transaction`** siempre que una operación modifique más de una tabla.
 
-6. **Cloudinary** es el proveedor de almacenamiento de imágenes. `CloudinaryService` en `src/common/cloudinary/` — inyectable globalmente. Las imágenes se optimizan con `sharp` (WebP, max 1200px, quality 80) antes de subir. Carpeta en Cloudinary: `{user.name}/garantias/` (usando el nombre completo del usuario, no el username). Ver `STACK.md`.
+6. **Cloudinary** es el proveedor de almacenamiento de imágenes. `CloudinaryService` en `src/common/cloudinary/` — inyectable globalmente. Las imágenes se optimizan con `sharp` (WebP, max 800px, quality 80) antes de subir. Carpeta en Cloudinary: `{user.name}/garantias/` (usando el nombre completo del usuario, no el username). Ver `STACK.md`.
 
-7. **Tests unitarios y E2E ya implementados** — Jest como framework (147 unit tests, 5 suites E2E, 17 spec files). Ver `TESTING.md`.
+7. **Tests unitarios y E2E ya implementados** — Jest como framework (172 unit tests, 20 spec files, 5 suites E2E). Ver `TESTING.md`.
 
 8. **Nunca devolver `passwordHash`** en ninguna respuesta de la API.
 
@@ -70,7 +70,7 @@ Este repositorio es exclusivamente el backend. El frontend vive en `prestamosya-
 `DELETE /api/payments/:id` → `voided=true`, `void_reason` obligatorio → revertir `paidAmount` en cuotas afectadas → recalcular estados → `$transaction`.
 
 ### Refinanciar
-`POST /api/loans/:id/refinance` → snapshot en `loan_refinances` → cuotas activas a `archived=true` → nuevas cuotas desde el saldo pendiente → `$transaction`.
+⚠️ **NO implementado todavía (Fase 9 pendiente en `LOANS_MODULE.md`).** No existe `POST /api/loans/:id/refinance` ni use-case de refinanciamiento. El dominio ya expone `LoanEntity.canBeRefinanced()`/`markAsRefinanced()` y `LoanNotRefinancableError`, y la tabla `loan_refinances` existe en BD, pero el flujo no está cableado. Flujo planificado: snapshot en `loan_refinances` → cuotas activas a `archived=true` → nuevas cuotas desde el saldo pendiente → `$transaction`.
 
 ### Cron de mora
 Corre a las 6:00 AM → detecta cuotas vencidas según `graceDays` → actualiza `daysOverdue` → sincroniza `ClientStatus`.

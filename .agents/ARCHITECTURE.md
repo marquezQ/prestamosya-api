@@ -268,12 +268,12 @@ El service **no conoce Request ni Response** de HTTP. Solo recibe parámetros ti
 - **Enums** (`enums/`): `LoanStatus`, `InstallmentStatus`, `LoanScheduleType`, `PeriodType`, `LoanMode`.
 - **Repositorios** (`repositories/`): Interfaces abstractas (`LoanRepository`, `InstallmentRepository`, `PaymentRepository`). No saben que existe Prisma.
 - **Servicios de dominio** (`services/`): `LoanCalculatorService` — genera cronogramas de cuotas (EQUAL_INSTALLMENTS e INTEREST_ONLY), calcula fechas de vencimiento, absorción de redondeo en la última cuota.
-- **Errores** (`errors/`): 8 clases de error de dominio (ej. `PaymentExceedsBalanceError`, `LoanNotActiveError`, `CurrencyMismatchError`).
+- **Errores** (`errors/`): 9 clases de error de dominio + base `LoanDomainError` (ej. `PaymentExceedsBalanceError`, `LoanNotActiveError`, `CurrencyMismatchError`).
 
 **Application** — orquesta el dominio. Conoce los repositorios (por interfaz) pero no sabe que existe Prisma.
 
 - **Puertos** (`ports/`): `UnitOfWork` — abstracción transaccional genérica.
-- **Use-cases** (`use-cases/`): 10 casos de uso implementados. Cada uno encapsula una operación de negocio completa.
+- **Use-cases** (`use-cases/`): 9 casos de uso implementados. Cada uno encapsula una operación de negocio completa.
 
 **Infrastructure** — la única capa que conoce Prisma y HTTP. Implementa los contratos del dominio.
 

@@ -12,7 +12,7 @@ Stack tecnológico, infraestructura, variables de entorno y decisiones técnicas
 | ORM | Prisma |
 | Base de datos | PostgreSQL 16 |
 | Autenticación | JWT (access token, 7 días por defecto) |
-| Almacenamiento de archivos | Cloudinary — imágenes de garantías. Optimizadas a WebP (max 1200px, quality 80) con `sharp` antes de subir. Carpeta: `{user.name}/garantias/` (nombre completo del usuario, no username) |
+| Almacenamiento de archivos | Cloudinary — imágenes de garantías. Optimizadas a WebP (max 800px, quality 80) con `sharp` antes de subir. Carpeta: `{user.name}/garantias/` (nombre completo del usuario, no username) |
 | Generación de PDF | `pdfmake` (uso server-side en Node.js, fuentes Roboto incluidas) |
 | Tareas programadas | @nestjs/schedule |
 | Validación | class-validator + class-transformer |

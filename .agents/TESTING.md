@@ -226,11 +226,11 @@ src/modules/guarantees/guarantees.service.spec.ts  (unit)
 src/modules/dashboard/**/*.spec.ts                 (unit)
 src/modules/stats/stats.service.spec.ts            (unit)
 src/modules/cron/services/overdue-processor.service.spec.ts (unit)
+test/app.e2e-spec.ts                                (e2e - smoke)
 test/auth.e2e-spec.ts                              (e2e)
 test/clients.e2e-spec.ts                           (e2e)
 test/loans.e2e-spec.ts                             (e2e)
 test/guarantees.e2e-spec.ts                        (e2e)
-test/stats.e2e-spec.ts                             (e2e)
 ```
 
 - **Unit:** `describe('AuthService')` / `describe('ClientsService')`, un `spec` por clase, `beforeEach` de reset mocks, `it` que describe el **invariante** o el caso borde.
@@ -261,7 +261,7 @@ test/stats.e2e-spec.ts                             (e2e)
 
 ## 9. Estado de implementación (Ejecutado: auth, users, business-config, clients, loans, guarantees, dashboard, stats, cron)
 
-Unit y E2E de `auth`, `clients`, `loans` y `guarantees` implementados y en verde. Tests unitarios del dominio y casos de uso del módulo `loans` (Clean Architecture). Tests unitarios de `users`, `business-config`, `dashboard`, `stats` y `cron`. El E2E de `loans` cubre la creación automática/manual, simulación, detalle y cuotas; el de `guarantees` cubre el CRUD y el ciclo AVAILABLE → IN_USE → AVAILABLE al vincular a un préstamo.
+Unit y E2E de `app`, `auth`, `clients`, `loans` y `guarantees` implementados y en verde. Tests unitarios del dominio y casos de uso del módulo `loans` (Clean Architecture). Tests unitarios de `users`, `business-config`, `dashboard`, `stats` y `cron`. El E2E de `loans` cubre la creación automática/manual, simulación, detalle y cuotas; el de `guarantees` cubre el CRUD y el ciclo AVAILABLE → IN_USE → AVAILABLE al vincular a un préstamo.
 
 | Id | Qué | Archivos | Estado |
 |----|-----|----------|--------|
@@ -283,7 +283,7 @@ Unit y E2E de `auth`, `clients`, `loans` y `guarantees` implementados y en verde
 | 16 | Unit `users` (UsersService) | `src/modules/users/users.service.spec.ts` | ✅ |
 | 17 | Unit `business-config` (BusinessConfigService) | `src/modules/business-config/business-config.service.spec.ts` | ✅ |
 
-**Resultado:** `pnpm test` → `163` tests en verde (`19` spec files). Cobertura del dominio de `loans` cercana al 100%. Las suites E2E viven en `test/` (`auth`, `clients`, `loans`, `guarantees`).
+**Resultado:** `pnpm test` → `172` tests en verde (`20` spec files). Cobertura del dominio de `loans` cercana al 100%. Las suites E2E viven en `test/` (`auth`, `clients`, `loans`, `guarantees`).
 
 ---
 
