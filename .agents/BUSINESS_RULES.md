@@ -5,6 +5,14 @@ Reglas de negocio que el agente debe respetar en todo momento.
 
 ---
 
+## Fechas del Dominio (Fechas Absolutas)
+
+- **Inmutabilidad y valor absoluto:** Las fechas financieras (`startDate`, `firstDueDate`, `dueDate`, `paymentDate`) son **absolutas**. Representan días calendario sin hora.
+- **Sin desplazamientos de zona horaria:** En la BD se persisten como `@db.Date` (medianoche UTC `YYYY-MM-DDT00:00:00.000Z`). Al formatearlas en la API, reportes o PDFs, **nunca debe aplicarse un offset local (como UTC-4 America/La_Paz)**, ya que restaría horas a la medianoche y provocaría un atraso erróneo de 1 día. Toda visualización o cálculo debe tratarse en modo **UTC puro** (usar `fmtDateColumn()` o componentes `getUTC*`).
+- **Instantes reales ≠ fechas absolutas:** Las marcas de tiempo reales (ej. fecha de generación de un reporte, `generatedAt`) SÍ dependen de la zona horaria y se presentan en `America/La_Paz` (`fmtShortDate()`, `fmtTodayLaPaz()`). No confundir ambos conceptos: un `@db.Date` no debe pasar por formateadores de zona, y un instante real no debe tratarse como fecha-calendario UTC.
+
+---
+
 ## Pagos
 
 - Un pago puede cubrir **una o varias cuotas** en una sola operación

@@ -137,3 +137,15 @@ Tipos permitidos: `feat`, `fix`, `test`, `chore`, `refactor`, `docs`, `perf`
 
 - **Postman y Herencia de Auth**: Dado que la seguridad (Bearer Token) está configurada globalmente en `main.ts` (`document.security`), **NUNCA** debes agregar el decorador `@ApiBearerAuth('access-token')` a nivel de controller ni método. 
 - Si agregas `@ApiBearerAuth`, Swagger coloca el esquema de seguridad directamente sobre ese endpoint. Cuando se exporta el JSON a Postman, Postman asigna la seguridad manual a esa petición, **rompiendo la herencia de la carpeta padre**. Al omitirlo, todas las rutas heredan limpiamente el token de la colección padre.
+
+---
+
+## Manejo de Fechas Absolutas (Sin Desfase de Zona Horaria)
+
+> [!IMPORTANT]
+> **REGLA ABSOLUTA DE FECHAS:** Todas las fechas de negocio (`startDate`, `firstDueDate`, `dueDate`, `paymentDate`) representan **fechas calendarias puras e inmutables** (`@db.Date` en Prisma). No tienen componente de hora.
+>
+> 1. **Persistencia y Lectura:** Se representan y almacenan siempre en UTC a medianoche (`YYYY-MM-DDT00:00:00.000Z`).
+> 2. **Formateo de fechas `@db.Date` (fechas absolutas):** Usar SIEMPRE `fmtDateColumn()` (extrae componentes UTC: `getUTCDate()`, `getUTCMonth()`, `getUTCFullYear()`). PROHIBIDO formatearlas con offset local como `America/La_Paz` (`UTC-4`), ya que resta 4 horas a la medianoche UTC e incurre en un **error crítico de desfase de -1 día** (ej. 20/09 impreso como 19/09). Ejemplos: columnas `F. Venc.` y `F. Pago` del PDF.
+> 3. **Formateo de instantes reales (marcas de tiempo):** `fmtShortDate()` y `fmtTodayLaPaz()` se reservan EXCLUSIVAMENTE para instantes con hora real (ej: `Generado: ${fmtTodayLaPaz()}`) y SÍ aplican `America/La_Paz`. Nunca combinarlos con fechas `@db.Date`.
+

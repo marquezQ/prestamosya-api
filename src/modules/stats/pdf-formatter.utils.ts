@@ -67,7 +67,25 @@ export function computeTotals(rows: PaymentRow[]): RowTotals {
 }
 
 /**
- * Formatea cualquier fecha a DD/MM/YYYY en zona horaria America/La_Paz.
+ * Formatea una fecha absoluta de calendario (`@db.Date` de PostgreSQL) a DD/MM/YYYY.
+ *
+ * Estas columnas se persisten sin hora y Prisma las materializa como medianoche UTC
+ * (`YYYY-MM-DDT00:00:00.000Z`). Para devolver el día tal cual se guardó NO debe
+ * aplicarse ningún offset de zona horaria, por lo que se extraen los componentes UTC.
+ * @example fmtDateColumn(new Date('2026-09-20T00:00:00.000Z')) → "20/09/2026"
+ */
+export function fmtDateColumn(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const year = d.getUTCFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+/**
+ * Formatea un instante real (fecha con hora) a DD/MM/YYYY en la zona horaria
+ * de America/La_Paz (UTC-4). Úsalo solo para marcas de tiempo reales
+ * (ej: "Generado"), nunca para columnas `@db.Date`.
  */
 export function fmtShortDate(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
@@ -84,16 +102,17 @@ export function fmtShortDate(date: Date | string): string {
  * Si se pagó el mismo día o antes, retorna 0.
  */
 export function computeDelayDays(dueDate: Date, paymentDate: Date): number {
-  const due = new Date(dueDate).setHours(0, 0, 0, 0);
-  const paid = new Date(paymentDate).setHours(0, 0, 0, 0);
+  const due = new Date(dueDate).setUTCHours(0, 0, 0, 0);
+  const paid = new Date(paymentDate).setUTCHours(0, 0, 0, 0);
   const diffMs = paid - due;
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   return diffDays > 0 ? diffDays : 0;
 }
 
 /**
- * Formatea la fecha actual en formato DD/MM/YYYY para la zona horaria de La Paz.
+ * Formatea la fecha actual (un instante real) en formato DD/MM/YYYY para la
+ * zona horaria de La Paz. Opcionalmente recibe una fecha de referencia para tests.
  */
-export function fmtTodayLaPaz(): string {
-  return fmtShortDate(new Date());
+export function fmtTodayLaPaz(referenceDate: Date = new Date()): string {
+  return fmtShortDate(referenceDate);
 }
