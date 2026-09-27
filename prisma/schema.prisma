@@ -22,6 +22,8 @@ model User {
   loans          Loan[]
   payments       Payment[]
   sessionTokens  SessionToken[]
+  notifications  Notification[]
+  deviceTokens   DeviceToken[]
 
   @@map("users")
 }
@@ -242,6 +244,34 @@ model LoanRefinance {
   @@map("loan_refinances")
 }
 
+model Notification {
+  id        String             @id @default(uuid())
+  userId    String             @map("user_id")
+  type      NotificationType   @default(DAILY_SUMMARY) @map("type")
+  title     String             @map("title") @db.VarChar(150)
+  body      String             @map("body") @db.VarChar(500)
+  payload   Json?              @map("payload")
+  readAt    DateTime?          @map("read_at") @db.Timestamptz(3)
+  createdAt DateTime           @default(now()) @db.Timestamptz(3) @map("created_at")
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model DeviceToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  platform  String   @map("platform") @db.VarChar(20)
+  token     String   @map("token") @db.VarChar(255)
+  createdAt DateTime @default(now()) @db.Timestamptz(3) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platform, token])
+  @@map("device_tokens")
+}
+
 enum Role {
   admin
   collector
@@ -318,4 +348,11 @@ enum RefinanceType {
   EXTEND_TERM
   ADDITIONAL_AMOUNT
   NEW_RATE
+}
+
+enum NotificationType {
+  DAILY_SUMMARY
+  DAILY_OVERDUE
+  PAYMENT_DUE
+  SYSTEM
 }
