@@ -13,6 +13,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { CronModule } from './modules/cron/cron.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { StatsModule } from './modules/stats/stats.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
 
@@ -30,6 +31,7 @@ import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
     CronModule,
     DashboardModule,
     StatsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [
