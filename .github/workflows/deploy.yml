@@ -39,7 +39,7 @@ jobs:
             if [ -d "dist" ]; then
               mv dist dist_backup
             fi
-            
+
             pnpm run build || {
               echo "Error en el Build. Restaurando backup..."
               if [ -d "dist_backup" ]; then
@@ -48,7 +48,8 @@ jobs:
               fi
               exit 1
             }
-            
+
+
             rm -rf dist_backup
 
             echo "========== Reiniciando PM2 =========="
