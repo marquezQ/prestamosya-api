@@ -132,6 +132,7 @@ model Loan {
   notes              String?
   createdAt          DateTime        @default(now()) @db.Timestamptz(3) @map("created_at")
   updatedAt          DateTime        @updatedAt @db.Timestamptz(3) @map("updated_at")
+  completedAt        DateTime?       @map("completed_at") @db.Date
   installments       Installment[]
   guarantees         LoanGuarantee[]
   refinances         LoanRefinance[]

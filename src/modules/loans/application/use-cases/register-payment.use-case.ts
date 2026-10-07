@@ -104,7 +104,7 @@ export class RegisterPaymentUseCase {
       //     LoanEntity.applyPayment() lanza:
       //       - LoanNotActiveError si el préstamo no está activo
       //       - PaymentExceedsBalanceError si el monto supera el saldo
-      loan.applyPayment(paymentAmount);
+      loan.applyPayment(paymentAmount, new Date(input.paymentDate));
 
       // 2c. Distribuir FIFO entre cuotas pendientes (Interés primero, Capital después)
       let remaining = paymentAmount;

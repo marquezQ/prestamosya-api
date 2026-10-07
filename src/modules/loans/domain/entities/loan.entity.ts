@@ -41,6 +41,7 @@ export class LoanEntity {
     public readonly notes: string | null,
     public installments: InstallmentEntity[],
     public readonly scheduleType: LoanScheduleType = LoanScheduleType.EQUAL_INSTALLMENTS,
+    public completedAt: Date | null = null,
   ) {}
 
   /** Moneda del préstamo, delegada al capitalAmount. */
@@ -78,7 +79,7 @@ export class LoanEntity {
    * @throws PaymentExceedsBalanceError si el monto supera el saldo pendiente
    * @throws LoanNotActiveError si el préstamo no está activo
    */
-  applyPayment(amount: Money): void {
+  applyPayment(amount: Money, paymentDate: Date): void {
     if (!this.canReceivePayment()) {
       throw new LoanNotActiveError(this.id ?? 'new', this.status);
     }
@@ -95,6 +96,7 @@ export class LoanEntity {
 
     if (this.outstandingBalance.isZero()) {
       this.status = LoanStatus.COMPLETED;
+      this.completedAt = paymentDate;
     }
   }
 
@@ -117,7 +119,11 @@ export class LoanEntity {
    * @throws SettlementExceedsBalanceError si amount + discount supera el saldo
    * @throws SettlementDoesNotClearBalanceError si amount + discount no liquida el saldo completo
    */
-  settleEarly(paymentAmount: Money, discountAmount: Money): void {
+  settleEarly(
+    paymentAmount: Money,
+    discountAmount: Money,
+    paymentDate: Date,
+  ): void {
     if (!this.canReceivePayment()) {
       throw new LoanNotActiveError(this.id ?? 'new', this.status);
     }
@@ -141,6 +147,7 @@ export class LoanEntity {
     this.outstandingBalance = this.outstandingBalance.subtract(totalSettlement);
     this.totalPaid = this.totalPaid.add(paymentAmount); // Solo dinero físico real
     this.status = LoanStatus.COMPLETED; // Garantizado: outstandingBalance == 0
+    this.completedAt = paymentDate;
   }
 
   /**
@@ -156,6 +163,7 @@ export class LoanEntity {
 
     if (this.isCompleted) {
       this.status = LoanStatus.ACTIVE;
+      this.completedAt = null;
     }
   }
 

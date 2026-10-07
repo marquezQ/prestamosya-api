@@ -1,7 +1,7 @@
 # DATABASE.md — prestamosya-api
 
 Esquema completo de la base de datos. PostgreSQL 16 gestionado con Prisma ORM.
-**12 tablas para el MVP.**
+**14 tablas para el MVP.**
 
 Convenciones: columnas en `snake_case` en BD (gestionado con `@map` en Prisma), campos en `camelCase` en código TypeScript.
 
@@ -23,6 +23,8 @@ Convenciones: columnas en `snake_case` en BD (gestionado con `@map` en Prisma), 
 | `payments`             | Pagos registrados — nunca se eliminan, solo se anulan   |
 | `payment_installments` | Distribución de un pago entre cuotas (desglose banking) |
 | `loan_refinances`      | Snapshot histórico de cada refinanciamiento             |
+| `notifications`        | Notificaciones in-app entregadas a los usuarios         |
+| `device_tokens`        | Push tokens registrados por dispositivo (Expo/APNs/FCM) |
 
 ---
 

@@ -106,7 +106,7 @@ describe('LoanEntity', () => {
     it('should reduce outstanding balance and increase totalPaid', () => {
       const loan = createLoan({ outstandingBalance: 1300, totalPaid: 0 });
 
-      loan.applyPayment(Money.of(400, 'BOB'));
+      loan.applyPayment(Money.of(400, 'BOB'), new Date());
 
       expect(loan.outstandingBalance.toNumber()).toBe(900);
       expect(loan.totalPaid.toNumber()).toBe(400);
@@ -116,7 +116,7 @@ describe('LoanEntity', () => {
     it('should mark as COMPLETED when balance reaches zero', () => {
       const loan = createLoan({ outstandingBalance: 500, totalPaid: 800 });
 
-      loan.applyPayment(Money.of(500, 'BOB'));
+      loan.applyPayment(Money.of(500, 'BOB'), new Date());
 
       expect(loan.outstandingBalance.toNumber()).toBe(0);
       expect(loan.totalPaid.toNumber()).toBe(1300);
@@ -126,7 +126,7 @@ describe('LoanEntity', () => {
     it('should throw PaymentExceedsBalanceError when amount exceeds balance', () => {
       const loan = createLoan({ outstandingBalance: 100 });
 
-      expect(() => loan.applyPayment(Money.of(200, 'BOB'))).toThrow(
+      expect(() => loan.applyPayment(Money.of(200, 'BOB'), new Date())).toThrow(
         PaymentExceedsBalanceError,
       );
     });
@@ -134,7 +134,7 @@ describe('LoanEntity', () => {
     it('should throw LoanNotActiveError when loan is not active', () => {
       const loan = createLoan({ status: LoanStatus.COMPLETED });
 
-      expect(() => loan.applyPayment(Money.of(100, 'BOB'))).toThrow(
+      expect(() => loan.applyPayment(Money.of(100, 'BOB'), new Date())).toThrow(
         LoanNotActiveError,
       );
     });

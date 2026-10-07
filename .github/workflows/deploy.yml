@@ -35,8 +35,21 @@ jobs:
             pnpm exec prisma migrate deploy
             pnpm exec prisma generate
 
-            echo "========== Compilando =========="
-            pnpm run build
+            echo "========== Compilando (Con Rollback) =========="
+            if [ -d "dist" ]; then
+              mv dist dist_backup
+            fi
+            
+            pnpm run build || {
+              echo "Error en el Build. Restaurando backup..."
+              if [ -d "dist_backup" ]; then
+                rm -rf dist
+                mv dist_backup dist
+              fi
+              exit 1
+            }
+            
+            rm -rf dist_backup
 
             echo "========== Reiniciando PM2 =========="
             pm2 restart prestamosya-api

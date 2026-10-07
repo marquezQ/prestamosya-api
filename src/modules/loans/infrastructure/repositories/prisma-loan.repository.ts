@@ -97,6 +97,7 @@ export class PrismaLoanRepository extends LoanRepository {
         totalPaid: loan.totalPaid.toString(),
         outstandingBalance: loan.outstandingBalance.toString(),
         status: loan.status,
+        completedAt: loan.completedAt,
       },
     });
   }

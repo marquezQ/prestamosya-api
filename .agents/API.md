@@ -209,6 +209,27 @@ GET  /api/stats/monthly-pdf?year=2026&month=9 → Buffer (binary application/pdf
 
 
 
+---
+
+## Notifications
+
+```
+GET    /api/notifications                      → NotificationItemDto[] (paginado: ?page=1&limit=20&onlyUnread=false)
+GET    /api/notifications/unread-count         → { unreadCount: number }
+PATCH  /api/notifications/:id/read             → boolean (true si marcó leída, false si no existía/ya leída)
+PATCH  /api/notifications/read-all            → { updatedCount: number }
+POST   /api/notifications/device-tokens        → 201 Created (body: { token, platform })
+DELETE /api/notifications/device-tokens        → 200 OK (body: { token })
+POST   /api/notifications/trigger-daily-summary → DailySummaryResultDto[] (Solo Admin, prueba manual)
+```
+
+> **Canal In-App vs Push:**
+> - `GET /api/notifications` y `PATCH /read` operan sobre el canal in-app (persistente en la BD).
+> - `POST /device-tokens` registra el token de Expo en la tabla `device_tokens` (operación `upsert` por `userId`, `platform` y `token`).
+> - `POST /trigger-daily-summary` ejecuta inmediatamente el cálculo del resumen diario de cobros y clientes en mora, entregando in-app y desapachando push a Expo.
+
+---
+
 ## Admin
 
 ```

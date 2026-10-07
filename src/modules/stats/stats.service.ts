@@ -582,7 +582,7 @@ export class StatsService {
         where: {
           createdBy: userId,
           status: 'COMPLETED',
-          updatedAt: { gte: startOfMonth, lt: endOfMonth },
+          completedAt: { gte: startOfMonth, lt: endOfMonth },
           client: { deletedAt: null },
         },
       }),

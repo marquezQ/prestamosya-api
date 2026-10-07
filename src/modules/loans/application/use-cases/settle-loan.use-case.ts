@@ -104,7 +104,11 @@ export class SettleLoanUseCase {
 
       // 2b. Validar y aplicar la liquidación en el dominio
       // Lanza: LoanNotActiveError, SettlementExceedsBalanceError, SettlementDoesNotClearBalanceError
-      loan.settleEarly(paymentAmount, discountAmount);
+      loan.settleEarly(
+        paymentAmount,
+        discountAmount,
+        new Date(input.paymentDate),
+      );
 
       // 2c. Mapa para acumular desgloses explícitos por cuota
       const settledMap = new Map<

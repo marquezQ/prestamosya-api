@@ -51,6 +51,7 @@ export class LoanMapper {
       installments,
       (raw.scheduleType as LoanScheduleType) ??
         LoanScheduleType.EQUAL_INSTALLMENTS,
+      raw.completedAt ?? null,
     );
   }
 
@@ -75,6 +76,7 @@ export class LoanMapper {
       startDate: entity.startDate,
       firstDueDate: entity.firstDueDate,
       notes: entity.notes,
+      completedAt: entity.completedAt,
     };
   }
 
@@ -100,6 +102,9 @@ export class LoanMapper {
       status: entity.status,
       startDate: entity.startDate.toISOString().split('T')[0],
       firstDueDate: entity.firstDueDate.toISOString().split('T')[0],
+      completedAt: entity.completedAt
+        ? entity.completedAt.toISOString().split('T')[0]
+        : null,
       notes: entity.notes,
       installments: entity.installments.map((i) =>
         InstallmentMapper.toResponseDto(i),
