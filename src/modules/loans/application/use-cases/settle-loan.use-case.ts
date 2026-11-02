@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { InstallmentEntity } from '../../domain/entities/installment.entity';
+import { LoanStatus } from '../../domain/enums';
 import { Money } from '../../domain/value-objects/money.vo';
 import { UnitOfWork } from '../ports/unit-of-work.port';
 
@@ -40,6 +41,24 @@ export interface SettleLoanResult {
   settledInstallments: SettledInstallmentResult[];
   loanStatus: string;
   outstandingBalance: number;
+}
+
+/**
+ * Resultado interno de la transacción — incluye metadatos necesarios
+ * para la actualización del estado del cliente post-commit.
+ */
+interface TxResult {
+  clientId: string;
+  paymentId: string;
+  loanId: string;
+  loanStatus: LoanStatus; // Tipo fuerte para comparaciones seguras post-transacción
+  amount: number;
+  discountAmount: number;
+  method: string;
+  paymentDate: string;
+  notes: string | null;
+  outstandingBalance: number;
+  settledInstallments: SettledInstallmentResult[];
 }
 
 /**
@@ -92,181 +111,135 @@ export class SettleLoanUseCase {
     //    El callback NO toca this.prisma directamente: todo usa el cliente
     //    transaccional `tx` a través de los repos. Así la transacción se
     //    completa y libera su conexión del pool antes de continuar.
-    const result = await this.unitOfWork.execute(async (repos) => {
-      // 2a. Cargar préstamo con cuotas pendientes en orden FIFO
-      const loan = await repos.loans.findByIdWithPendingInstallments(
-        input.loanId,
-      );
+    const result = await this.unitOfWork.execute(
+      async (repos): Promise<TxResult> => {
+        // 2a. Cargar préstamo con cuotas pendientes en orden FIFO
+        const loan = await repos.loans.findByIdWithPendingInstallments(
+          input.loanId,
+        );
 
-      if (!loan) {
-        throw new NotFoundException('Loan not found');
-      }
-
-      const paymentAmount = Money.of(input.amount, loan.currency);
-      const discountAmount = Money.of(input.discount, loan.currency);
-
-      // 2b. Validar y aplicar la liquidación en el dominio
-      // Lanza: LoanNotActiveError, SettlementExceedsBalanceError, SettlementDoesNotClearBalanceError
-      loan.settleEarly(
-        paymentAmount,
-        discountAmount,
-        new Date(input.paymentDate),
-      );
-
-      // 2c. Mapa para acumular desgloses explícitos por cuota
-      const settledMap = new Map<
-        string,
-        {
-          installment: InstallmentEntity;
-          interestPaid: Money;
-          capitalPaid: Money;
-          interestDiscounted: Money;
-          capitalDiscounted: Money;
+        if (!loan) {
+          throw new NotFoundException('Loan not found');
         }
-      >();
 
-      const zeroMoney = Money.of(0, loan.currency);
+        const paymentAmount = Money.of(input.amount, loan.currency);
+        const discountAmount = Money.of(input.discount, loan.currency);
 
-      const getOrCreateSettled = (inst: InstallmentEntity) => {
-        let entry = settledMap.get(inst.id!);
-        if (!entry) {
-          entry = {
-            installment: inst,
-            interestPaid: zeroMoney,
-            capitalPaid: zeroMoney,
-            interestDiscounted: zeroMoney,
-            capitalDiscounted: zeroMoney,
-          };
-          settledMap.set(inst.id!, entry);
+        // 2b. Validar y aplicar la liquidación en el dominio
+        // Lanza: LoanNotActiveError, SettlementExceedsBalanceError, SettlementDoesNotClearBalanceError
+        loan.settleEarly(
+          paymentAmount,
+          discountAmount,
+          new Date(input.paymentDate),
+        );
+
+        // 2c. Mapa para acumular desgloses explícitos por cuota
+        const settledMap = new Map<
+          string,
+          {
+            installment: InstallmentEntity;
+            interestPaid: Money;
+            capitalPaid: Money;
+            interestDiscounted: Money;
+            capitalDiscounted: Money;
+          }
+        >();
+
+        const zeroMoney = Money.of(0, loan.currency);
+
+        const getOrCreateSettled = (inst: InstallmentEntity) => {
+          let entry = settledMap.get(inst.id!);
+          if (!entry) {
+            entry = {
+              installment: inst,
+              interestPaid: zeroMoney,
+              capitalPaid: zeroMoney,
+              interestDiscounted: zeroMoney,
+              capitalDiscounted: zeroMoney,
+            };
+            settledMap.set(inst.id!, entry);
+          }
+          return entry;
+        };
+
+        // 2d. Distribuir el descuento (discountAmount) PRIMERO sobre el interés no cubierto
+        //     de las cuotas pendientes (condonación de interés futuro).
+        let remainingDiscount = discountAmount;
+
+        for (const installment of loan.installments) {
+          if (remainingDiscount.isZero()) break;
+          if (installment.isPaid) continue;
+
+          const currentPaid = installment.paidAmount;
+          const interestAmt = installment.interestAmount;
+          const interestUnpaid = interestAmt.isGreaterThan(currentPaid)
+            ? interestAmt.subtract(currentPaid)
+            : zeroMoney;
+
+          if (!interestUnpaid.isZero()) {
+            const discountToApply = remainingDiscount.isGreaterThan(
+              interestUnpaid,
+            )
+              ? interestUnpaid
+              : remainingDiscount;
+
+            const surplus = installment.applyPayment(discountToApply);
+            const applied = discountToApply.subtract(surplus);
+
+            if (!applied.isZero()) {
+              const entry = getOrCreateSettled(installment);
+              entry.interestDiscounted = entry.interestDiscounted.add(applied);
+            }
+
+            remainingDiscount = remainingDiscount.subtract(applied);
+          }
         }
-        return entry;
-      };
 
-      // 2d. Distribuir el descuento (discountAmount) PRIMERO sobre el interés no cubierto
-      //     de las cuotas pendientes (condonación de interés futuro).
-      let remainingDiscount = discountAmount;
+        // Si aún queda excedente de descuento, aplicarlo como descuento a capital.
+        // NOTA: este bloque es inalcanzable en condiciones normales porque
+        // loan.settleEarly() lanza DiscountExceedsPendingInterestError cuando
+        // el descuento supera el interés pendiente. Se mantiene como defensa
+        // en profundidad para no dejar saldo sin resolver si el invariante
+        // se viola por algún camino no previsto.
+        for (const installment of loan.installments) {
+          if (remainingDiscount.isZero()) break;
+          if (installment.isPaid) continue;
 
-      for (const installment of loan.installments) {
-        if (remainingDiscount.isZero()) break;
-        if (installment.isPaid) continue;
-
-        const currentPaid = installment.paidAmount;
-        const interestAmt = installment.interestAmount;
-        const interestUnpaid = interestAmt.isGreaterThan(currentPaid)
-          ? interestAmt.subtract(currentPaid)
-          : zeroMoney;
-
-        if (!interestUnpaid.isZero()) {
-          const discountToApply = remainingDiscount.isGreaterThan(
-            interestUnpaid,
-          )
-            ? interestUnpaid
-            : remainingDiscount;
-
-          const surplus = installment.applyPayment(discountToApply);
-          const applied = discountToApply.subtract(surplus);
+          const surplus = installment.applyPayment(remainingDiscount);
+          const applied = remainingDiscount.subtract(surplus);
 
           if (!applied.isZero()) {
             const entry = getOrCreateSettled(installment);
-            entry.interestDiscounted = entry.interestDiscounted.add(applied);
+            entry.capitalDiscounted = entry.capitalDiscounted.add(applied);
           }
 
-          remainingDiscount = remainingDiscount.subtract(applied);
-        }
-      }
-
-      // Si aún queda excedente de descuento, aplicarlo como descuento a capital
-      for (const installment of loan.installments) {
-        if (remainingDiscount.isZero()) break;
-        if (installment.isPaid) continue;
-
-        const surplus = installment.applyPayment(remainingDiscount);
-        const applied = remainingDiscount.subtract(surplus);
-
-        if (!applied.isZero()) {
-          const entry = getOrCreateSettled(installment);
-          entry.capitalDiscounted = entry.capitalDiscounted.add(applied);
+          remainingDiscount = surplus;
         }
 
-        remainingDiscount = surplus;
-      }
+        // 2e. Distribuir el dinero físico (paymentAmount / cash) SEGUNDO
+        //     usando applyPaymentDetailed para registrar interés pagado y capital pagado.
+        let remainingPayment = paymentAmount;
 
-      // 2e. Distribuir el dinero físico (paymentAmount / cash) SEGUNDO
-      //     usando applyPaymentDetailed para registrar interés pagado y capital pagado.
-      let remainingPayment = paymentAmount;
+        for (const installment of loan.installments) {
+          if (remainingPayment.isZero()) break;
+          if (installment.isPaid) continue;
 
-      for (const installment of loan.installments) {
-        if (remainingPayment.isZero()) break;
-        if (installment.isPaid) continue;
+          const { surplus, interestPaid, capitalPaid } =
+            installment.applyPaymentDetailed(remainingPayment);
 
-        const { surplus, interestPaid, capitalPaid } =
-          installment.applyPaymentDetailed(remainingPayment);
+          if (!interestPaid.isZero() || !capitalPaid.isZero()) {
+            const entry = getOrCreateSettled(installment);
+            entry.interestPaid = entry.interestPaid.add(interestPaid);
+            entry.capitalPaid = entry.capitalPaid.add(capitalPaid);
+          }
 
-        if (!interestPaid.isZero() || !capitalPaid.isZero()) {
-          const entry = getOrCreateSettled(installment);
-          entry.interestPaid = entry.interestPaid.add(interestPaid);
-          entry.capitalPaid = entry.capitalPaid.add(capitalPaid);
+          remainingPayment = surplus;
         }
 
-        remainingPayment = surplus;
-      }
+        const settledInstallments = Array.from(settledMap.values());
 
-      const settledInstallments = Array.from(settledMap.values());
-
-      // 2f. Persistir en la transacción
-      const installmentLinks = settledInstallments.map(
-        ({
-          installment,
-          interestPaid,
-          capitalPaid,
-          interestDiscounted,
-          capitalDiscounted,
-        }) => ({
-          installmentId: installment.id!,
-          interestPaid: interestPaid.toString(),
-          capitalPaid: capitalPaid.toString(),
-          interestDiscounted: interestDiscounted.toString(),
-          capitalDiscounted: capitalDiscounted.toString(),
-        }),
-      );
-
-      const paymentId = await repos.payments.create({
-        loanId: loan.id!,
-        registeredBy: userId,
-        amount: paymentAmount.toString(),
-        discountAmount: discountAmount.toString(),
-        paymentDate: new Date(input.paymentDate),
-        method: input.method,
-        notes: input.notes ?? null,
-        installmentLinks,
-      });
-
-      // Actualizar todas las cuotas afectadas (pago + descuento)
-      const allAffectedInstallments = settledInstallments.map(
-        (s) => s.installment,
-      );
-      await repos.installments.updateMany(allAffectedInstallments);
-
-      // Actualizar préstamo (status=COMPLETED, outstandingBalance=0, totalPaid actualizado)
-      await repos.loans.update(loan);
-
-      // 2g. Retornar resultado + metadatos necesarios post-transacción.
-      //     El estado del cliente se actualiza DESPUÉS de que T1 haga commit
-      //     para evitar la violación de atomicidad que ocurría al llamar
-      //     this.prisma dentro del callback (cliente podía quedar en NO_LOAN
-      //     aunque la transacción principal hiciera rollback posteriormente).
-      return {
-        paymentId,
-        loanId: loan.id!,
-        clientId: loan.clientId,
-        amount: paymentAmount.toNumber(),
-        discountAmount: discountAmount.toNumber(),
-        method: input.method,
-        paymentDate: input.paymentDate,
-        notes: input.notes ?? null,
-        loanStatus: loan.status,
-        outstandingBalance: loan.outstandingBalance.toNumber(),
-        settledInstallments: settledInstallments.map(
+        // 2f. Persistir en la transacción
+        const installmentLinks = settledInstallments.map(
           ({
             installment,
             interestPaid,
@@ -275,15 +248,68 @@ export class SettleLoanUseCase {
             capitalDiscounted,
           }) => ({
             installmentId: installment.id!,
-            installmentNumber: installment.installmentNumber,
-            amountApplied: interestPaid.add(capitalPaid).toNumber(),
-            discountApplied: interestDiscounted
-              .add(capitalDiscounted)
-              .toNumber(),
+            interestPaid: interestPaid.toString(),
+            capitalPaid: capitalPaid.toString(),
+            interestDiscounted: interestDiscounted.toString(),
+            capitalDiscounted: capitalDiscounted.toString(),
           }),
-        ),
-      };
-    });
+        );
+
+        const paymentId = await repos.payments.create({
+          loanId: loan.id!,
+          registeredBy: userId,
+          amount: paymentAmount.toString(),
+          discountAmount: discountAmount.toString(),
+          paymentDate: new Date(input.paymentDate),
+          method: input.method,
+          notes: input.notes ?? null,
+          installmentLinks,
+        });
+
+        // Actualizar todas las cuotas afectadas (pago + descuento)
+        const allAffectedInstallments = settledInstallments.map(
+          (s) => s.installment,
+        );
+        await repos.installments.updateMany(allAffectedInstallments);
+
+        // Actualizar préstamo (status=COMPLETED, outstandingBalance=0, totalPaid actualizado)
+        await repos.loans.update(loan);
+
+        // 2g. Retornar resultado + metadatos necesarios post-transacción.
+        //     El estado del cliente se actualiza DESPUÉS de que T1 haga commit
+        //     para evitar la violación de atomicidad que ocurría al llamar
+        //     this.prisma dentro del callback (cliente podía quedar en NO_LOAN
+        //     aunque la transacción principal hiciera rollback posteriormente).
+        return {
+          paymentId,
+          loanId: loan.id!,
+          clientId: loan.clientId,
+          amount: paymentAmount.toNumber(),
+          discountAmount: discountAmount.toNumber(),
+          method: input.method,
+          paymentDate: input.paymentDate,
+          notes: input.notes ?? null,
+          loanStatus: loan.status,
+          outstandingBalance: loan.outstandingBalance.toNumber(),
+          settledInstallments: settledInstallments.map(
+            ({
+              installment,
+              interestPaid,
+              capitalPaid,
+              interestDiscounted,
+              capitalDiscounted,
+            }) => ({
+              installmentId: installment.id!,
+              installmentNumber: installment.installmentNumber,
+              amountApplied: interestPaid.add(capitalPaid).toNumber(),
+              discountApplied: interestDiscounted
+                .add(capitalDiscounted)
+                .toNumber(),
+            }),
+          ),
+        };
+      },
+    );
 
     // 3. Post-transacción: T1 ya hizo COMMIT y liberó su conexión.
     //    settle-loan siempre resulta en COMPLETED, pero verificamos igualmente.
@@ -292,7 +318,7 @@ export class SettleLoanUseCase {
     const activeLoanCount = await this.prisma.loan.count({
       where: {
         clientId: result.clientId,
-        status: 'ACTIVE',
+        status: LoanStatus.ACTIVE,
         id: { not: result.loanId }, // Excluir el préstamo recién completado
       },
     });
@@ -304,8 +330,18 @@ export class SettleLoanUseCase {
       });
     }
 
-    // Omitir clientId del resultado público (es dato interno de post-proceso)
-    const { clientId: _clientId, ...publicResult } = result;
-    return publicResult;
+    // 4. Construir y retornar el resultado público (sin clientId)
+    return {
+      paymentId: result.paymentId,
+      loanId: result.loanId,
+      loanStatus: result.loanStatus,
+      amount: result.amount,
+      discountAmount: result.discountAmount,
+      method: result.method,
+      paymentDate: result.paymentDate,
+      notes: result.notes,
+      outstandingBalance: result.outstandingBalance,
+      settledInstallments: result.settledInstallments,
+    };
   }
 }

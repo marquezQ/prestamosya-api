@@ -81,3 +81,12 @@ export class SettlementDoesNotClearBalanceError extends LoanDomainError {
     this.name = 'SettlementDoesNotClearBalanceError';
   }
 }
+
+export class DiscountExceedsPendingInterestError extends LoanDomainError {
+  constructor(discountAmount: string, pendingInterest: string) {
+    super(
+      `Discount (${discountAmount}) exceeds total pending interest (${pendingInterest}). Discounts can only be applied to interest, never to capital.`,
+    );
+    this.name = 'DiscountExceedsPendingInterestError';
+  }
+}

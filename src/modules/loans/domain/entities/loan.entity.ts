@@ -6,6 +6,7 @@ import {
   PaymentExceedsBalanceError,
   SettlementDoesNotClearBalanceError,
   SettlementExceedsBalanceError,
+  DiscountExceedsPendingInterestError,
 } from '../errors/loan-domain.errors';
 import { Currency, Money } from '../value-objects/money.vo';
 import { InstallmentEntity } from './installment.entity';
@@ -118,6 +119,7 @@ export class LoanEntity {
    * @throws LoanNotActiveError si el préstamo no está activo
    * @throws SettlementExceedsBalanceError si amount + discount supera el saldo
    * @throws SettlementDoesNotClearBalanceError si amount + discount no liquida el saldo completo
+   * @throws DiscountExceedsPendingInterestError si discount supera el interés pendiente total
    */
   settleEarly(
     paymentAmount: Money,
@@ -142,6 +144,18 @@ export class LoanEntity {
         totalSettlement.toString(),
         this.outstandingBalance.toString(),
       );
+    }
+
+    // REGLA CRÍTICA: el descuento solo puede aplicarse sobre interés pendiente,
+    // NUNCA sobre capital. Protege la integridad del capital prestado.
+    if (!discountAmount.isZero()) {
+      const pendingInterest = this.totalPendingInterest;
+      if (discountAmount.isGreaterThan(pendingInterest)) {
+        throw new DiscountExceedsPendingInterestError(
+          discountAmount.toString(),
+          pendingInterest.toString(),
+        );
+      }
     }
 
     this.outstandingBalance = this.outstandingBalance.subtract(totalSettlement);
@@ -192,5 +206,30 @@ export class LoanEntity {
     return this.installments
       .filter((i) => !i.isArchived)
       .sort((a, b) => a.installmentNumber - b.installmentNumber);
+  }
+
+  /**
+   * Suma del interés pendiente de cobro en todas las cuotas no pagadas.
+   *
+   * Regla de negocio: el descuento en una liquidación anticipada SOLO puede
+   * aplicarse sobre este monto — nunca sobre capital. Si el descuento solicitado
+   * supera este valor, la liquidación debe ser rechazada.
+   */
+  get totalPendingInterest(): Money {
+    const zero = Money.zero(this.currency);
+    return this.installments
+      .filter((i) => !i.isPaid && !i.isArchived)
+      .reduce((acc, inst) => {
+        // Interés ya cubierto por pagos anteriores en esta cuota
+        const interestAlreadyCovered = inst.paidAmount.isGreaterThan(
+          inst.interestAmount,
+        )
+          ? inst.interestAmount
+          : inst.paidAmount;
+        const interestUnpaid = inst.interestAmount.subtract(
+          interestAlreadyCovered,
+        );
+        return acc.add(interestUnpaid);
+      }, zero);
   }
 }

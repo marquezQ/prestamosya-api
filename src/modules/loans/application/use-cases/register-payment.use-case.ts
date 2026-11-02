@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { LoanStatus } from '../../domain/enums';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { InstallmentEntity } from '../../domain/entities/installment.entity';
 import { Money } from '../../domain/value-objects/money.vo';
@@ -40,6 +41,23 @@ export interface RegisterPaymentResult {
   affectedInstallments: AffectedInstallmentResult[];
   loanStatus: string;
   outstandingBalance: number;
+}
+
+/**
+ * Resultado interno de la transacción — incluye metadatos necesarios
+ * para la actualización del estado del cliente post-commit.
+ */
+interface TxResult {
+  clientId: string;
+  paymentId: string;
+  loanId: string;
+  loanStatus: LoanStatus; // Tipo fuerte para comparaciones seguras post-transacción
+  amount: number;
+  method: string;
+  paymentDate: string;
+  notes: string | null;
+  outstandingBalance: number;
+  affectedInstallments: AffectedInstallmentResult[];
 }
 
 /**
@@ -89,128 +107,139 @@ export class RegisterPaymentUseCase {
     //    El callback NO toca this.prisma directamente: todo usa el cliente
     //    transaccional `tx` a través de los repos. Así la transacción se
     //    completa y libera su conexión del pool antes de continuar.
-    const result = await this.unitOfWork.execute(async (repos) => {
-      // 2a. Cargar préstamo con cuotas pendientes en orden FIFO
-      const loan = await repos.loans.findByIdWithPendingInstallments(
-        input.loanId,
-      );
+    const tx = await this.unitOfWork.execute(
+      async (repos): Promise<TxResult> => {
+        // 2a. Cargar préstamo con cuotas pendientes en orden FIFO
+        const loan = await repos.loans.findByIdWithPendingInstallments(
+          input.loanId,
+        );
 
-      if (!loan) {
-        throw new NotFoundException('Loan not found');
-      }
-
-      const paymentAmount = Money.of(input.amount, loan.currency);
-
-      // 2b. Aplicar el pago al préstamo (valida que esté ACTIVE y que el monto
-      //     no supere el outstandingBalance — lanza LoanDomainError si falla)
-      //     Lo hacemos ANTES del FIFO para que la validación ocurra primero.
-      //     LoanEntity.applyPayment() lanza:
-      //       - LoanNotActiveError si el préstamo no está activo
-      //       - PaymentExceedsBalanceError si el monto supera el saldo
-      loan.applyPayment(paymentAmount, new Date(input.paymentDate));
-
-      // 2c. Distribuir FIFO entre cuotas pendientes (Interés primero, Capital después)
-      let remaining = paymentAmount;
-      const affectedInstallments: Array<{
-        installment: InstallmentEntity;
-        interestPaid: Money;
-        capitalPaid: Money;
-      }> = [];
-
-      for (const installment of loan.installments) {
-        if (remaining.isZero()) break;
-
-        const { surplus, interestPaid, capitalPaid } =
-          installment.applyPaymentDetailed(remaining);
-
-        if (!interestPaid.isZero() || !capitalPaid.isZero()) {
-          affectedInstallments.push({
-            installment,
-            interestPaid,
-            capitalPaid,
-          });
+        if (!loan) {
+          throw new NotFoundException('Loan not found');
         }
 
-        remaining = surplus;
-      }
+        const paymentAmount = Money.of(input.amount, loan.currency);
 
-      // 2d. Persistir en la transacción
-      const paymentId = await repos.payments.create({
-        loanId: loan.id!,
-        registeredBy: userId,
-        amount: paymentAmount.toString(),
-        paymentDate: new Date(input.paymentDate),
-        method: input.method,
-        notes: input.notes ?? null,
-        installmentLinks: affectedInstallments.map(
-          ({ installment, interestPaid, capitalPaid }) => ({
-            installmentId: installment.id!,
-            interestPaid: interestPaid.toString(),
-            capitalPaid: capitalPaid.toString(),
-            interestDiscounted: '0.00',
-            capitalDiscounted: '0.00',
-          }),
-        ),
-      });
+        // 2b. Aplicar el pago al préstamo (valida que esté ACTIVE y que el monto
+        //     no supere el outstandingBalance — lanza LoanDomainError si falla)
+        //     Lo hacemos ANTES del FIFO para que la validación ocurra primero.
+        //     LoanEntity.applyPayment() lanza:
+        //       - LoanNotActiveError si el préstamo no está activo
+        //       - PaymentExceedsBalanceError si el monto supera el saldo
+        loan.applyPayment(paymentAmount, new Date(input.paymentDate));
 
-      // Actualizar cuotas afectadas (paidAmount, status, paidAt)
-      await repos.installments.updateMany(
-        affectedInstallments.map(({ installment }) => installment),
-      );
+        // 2c. Distribuir FIFO entre cuotas pendientes (Interés primero, Capital después)
+        let remaining = paymentAmount;
+        const affectedInstallments: Array<{
+          installment: InstallmentEntity;
+          interestPaid: Money;
+          capitalPaid: Money;
+        }> = [];
 
-      // Actualizar préstamo (totalPaid, outstandingBalance, status)
-      await repos.loans.update(loan);
+        for (const installment of loan.installments) {
+          if (remaining.isZero()) break;
 
-      // 2e. Retornar resultado + metadatos necesarios post-transacción.
-      //     El estado del cliente se actualiza DESPUÉS de que T1 haga commit
-      //     para evitar la violación de atomicidad que ocurría al llamar
-      //     this.prisma dentro del callback (cliente podía quedar en NO_LOAN
-      //     aunque la transacción principal hiciera rollback posteriormente).
-      return {
-        paymentId,
-        loanId: loan.id!,
-        clientId: loan.clientId,
-        loanStatus: loan.status,
-        amount: paymentAmount.toNumber(),
-        method: input.method,
-        paymentDate: input.paymentDate,
-        notes: input.notes ?? null,
-        outstandingBalance: loan.outstandingBalance.toNumber(),
-        affectedInstallments: affectedInstallments.map(
-          ({ installment, interestPaid, capitalPaid }) => ({
-            installmentId: installment.id!,
-            installmentNumber: installment.installmentNumber,
-            amountApplied: interestPaid.add(capitalPaid).toNumber(),
-            newStatus: installment.status,
-            remainingAmount: installment.remainingAmount.toNumber(),
-          }),
-        ),
-      };
-    });
+          const { surplus, interestPaid, capitalPaid } =
+            installment.applyPaymentDetailed(remaining);
+
+          if (!interestPaid.isZero() || !capitalPaid.isZero()) {
+            affectedInstallments.push({
+              installment,
+              interestPaid,
+              capitalPaid,
+            });
+          }
+
+          remaining = surplus;
+        }
+
+        // 2d. Persistir en la transacción
+        const paymentId = await repos.payments.create({
+          loanId: loan.id!,
+          registeredBy: userId,
+          amount: paymentAmount.toString(),
+          paymentDate: new Date(input.paymentDate),
+          method: input.method,
+          notes: input.notes ?? null,
+          installmentLinks: affectedInstallments.map(
+            ({ installment, interestPaid, capitalPaid }) => ({
+              installmentId: installment.id!,
+              interestPaid: interestPaid.toString(),
+              capitalPaid: capitalPaid.toString(),
+              interestDiscounted: '0.00',
+              capitalDiscounted: '0.00',
+            }),
+          ),
+        });
+
+        // Actualizar cuotas afectadas (paidAmount, status, paidAt)
+        await repos.installments.updateMany(
+          affectedInstallments.map(({ installment }) => installment),
+        );
+
+        // Actualizar préstamo (totalPaid, outstandingBalance, status)
+        await repos.loans.update(loan);
+
+        // 2e. Retornar TxResult — incluye clientId para la actualización
+        //     post-transacción y loanStatus tipado fuerte para comparaciones seguras.
+        //     El estado del cliente se actualiza DESPUÉS de que T1 haga commit
+        //     para evitar la violación de atomicidad que ocurría al llamar
+        //     this.prisma dentro del callback.
+        return {
+          clientId: loan.clientId,
+          paymentId,
+          loanId: loan.id!,
+          loanStatus: loan.status,
+          amount: paymentAmount.toNumber(),
+          method: input.method,
+          paymentDate: input.paymentDate,
+          notes: input.notes ?? null,
+          outstandingBalance: loan.outstandingBalance.toNumber(),
+          affectedInstallments: affectedInstallments.map(
+            ({ installment, interestPaid, capitalPaid }) => ({
+              installmentId: installment.id!,
+              installmentNumber: installment.installmentNumber,
+              amountApplied: interestPaid.add(capitalPaid).toNumber(),
+              newStatus: installment.status,
+              remainingAmount: installment.remainingAmount.toNumber(),
+            }),
+          ),
+        };
+      },
+    );
 
     // 3. Post-transacción: T1 ya hizo COMMIT y liberó su conexión.
     //    Si el préstamo quedó COMPLETED, evaluar si el cliente tiene otros
     //    préstamos activos. Si no tiene ninguno, volver a NO_LOAN.
     //    Si este UPDATE falla, el cron de las 6 AM corrige el estado.
-    if (result.loanStatus === 'COMPLETED') {
+    if (tx.loanStatus === LoanStatus.COMPLETED) {
       const activeLoanCount = await this.prisma.loan.count({
         where: {
-          clientId: result.clientId,
-          status: 'ACTIVE',
-          id: { not: result.loanId }, // Excluir el préstamo recién completado
+          clientId: tx.clientId,
+          status: LoanStatus.ACTIVE,
+          id: { not: tx.loanId }, // Excluir el préstamo recién completado
         },
       });
 
       if (activeLoanCount === 0) {
         await this.prisma.client.update({
-          where: { id: result.clientId },
+          where: { id: tx.clientId },
           data: { status: 'NO_LOAN' },
         });
       }
     }
 
-    // Omitir clientId del resultado público (es dato interno de post-proceso)
-    const { clientId: _clientId, ...publicResult } = result;
-    return publicResult;
+    // 4. Construir y retornar el resultado público (sin clientId)
+    return {
+      paymentId: tx.paymentId,
+      loanId: tx.loanId,
+      loanStatus: tx.loanStatus,
+      amount: tx.amount,
+      method: tx.method,
+      paymentDate: tx.paymentDate,
+      notes: tx.notes,
+      outstandingBalance: tx.outstandingBalance,
+      affectedInstallments: tx.affectedInstallments,
+    };
   }
 }
