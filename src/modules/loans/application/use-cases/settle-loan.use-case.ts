@@ -88,8 +88,11 @@ export class SettleLoanUseCase {
       throw new NotFoundException('Loan not found');
     }
 
-    // 2. Ejecutar en transacción atómica
-    return this.unitOfWork.execute(async (repos) => {
+    // 2. Ejecutar la transacción atómica (pago + cuotas + préstamo).
+    //    El callback NO toca this.prisma directamente: todo usa el cliente
+    //    transaccional `tx` a través de los repos. Así la transacción se
+    //    completa y libera su conexión del pool antes de continuar.
+    const result = await this.unitOfWork.execute(async (repos) => {
       // 2a. Cargar préstamo con cuotas pendientes en orden FIFO
       const loan = await repos.loans.findByIdWithPendingInstallments(
         input.loanId,
@@ -247,15 +250,22 @@ export class SettleLoanUseCase {
       // Actualizar préstamo (status=COMPLETED, outstandingBalance=0, totalPaid actualizado)
       await repos.loans.update(loan);
 
-      // 2f. Construir resultado
+      // 2g. Retornar resultado + metadatos necesarios post-transacción.
+      //     El estado del cliente se actualiza DESPUÉS de que T1 haga commit
+      //     para evitar la violación de atomicidad que ocurría al llamar
+      //     this.prisma dentro del callback (cliente podía quedar en NO_LOAN
+      //     aunque la transacción principal hiciera rollback posteriormente).
       return {
         paymentId,
         loanId: loan.id!,
+        clientId: loan.clientId,
         amount: paymentAmount.toNumber(),
         discountAmount: discountAmount.toNumber(),
         method: input.method,
         paymentDate: input.paymentDate,
         notes: input.notes ?? null,
+        loanStatus: loan.status,
+        outstandingBalance: loan.outstandingBalance.toNumber(),
         settledInstallments: settledInstallments.map(
           ({
             installment,
@@ -272,9 +282,30 @@ export class SettleLoanUseCase {
               .toNumber(),
           }),
         ),
-        loanStatus: loan.status,
-        outstandingBalance: loan.outstandingBalance.toNumber(),
       };
     });
+
+    // 3. Post-transacción: T1 ya hizo COMMIT y liberó su conexión.
+    //    settle-loan siempre resulta en COMPLETED, pero verificamos igualmente.
+    //    Si el cliente no tiene otros préstamos activos, volver a NO_LOAN.
+    //    Si este UPDATE falla, el cron de las 6 AM corrige el estado.
+    const activeLoanCount = await this.prisma.loan.count({
+      where: {
+        clientId: result.clientId,
+        status: 'ACTIVE',
+        id: { not: result.loanId }, // Excluir el préstamo recién completado
+      },
+    });
+
+    if (activeLoanCount === 0) {
+      await this.prisma.client.update({
+        where: { id: result.clientId },
+        data: { status: 'NO_LOAN' },
+      });
+    }
+
+    // Omitir clientId del resultado público (es dato interno de post-proceso)
+    const { clientId: _clientId, ...publicResult } = result;
+    return publicResult;
   }
 }

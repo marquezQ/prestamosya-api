@@ -12,6 +12,7 @@ export interface OverdueProcessResult {
   updatedInstallmentsCount: number;
   markedDelinquentClientsCount: number;
   restoredCurrentClientsCount: number;
+  restoredNoLoanClientsCount: number;
 }
 
 /**
@@ -133,8 +134,9 @@ export class OverdueProcessorService {
       updatedInstallmentsCount = installmentsToUpdate.length;
     }
 
-    // 4. Evaluar y actualizar estado de clientes (DELINQUENT vs CURRENT)
-    // Cargar todos los clientes que tienen al menos un préstamo activo
+    // 4. Evaluar y actualizar estado de clientes (DELINQUENT vs CURRENT vs NO_LOAN)
+    // Cargar todos los clientes que tienen status CURRENT o DELINQUENT,
+    // incluyendo sus préstamos activos y sus cuotas no pagadas.
     const activeClients = await this.prisma.client.findMany({
       where: {
         deletedAt: null,
@@ -164,8 +166,15 @@ export class OverdueProcessorService {
 
     const clientsToDelinquent: string[] = [];
     const clientsToCurrent: string[] = [];
+    const clientsToNoLoan: string[] = [];
 
     for (const client of activeClients) {
+      // Si ya no tiene ningún préstamo ACTIVE → volver a NO_LOAN
+      if (client.loans.length === 0) {
+        clientsToNoLoan.push(client.id);
+        continue;
+      }
+
       const graceDays = userGraceDaysMap.get(client.userId) ?? 0;
       const cutoffDate = subDays(today, graceDays);
 
@@ -203,19 +212,28 @@ export class OverdueProcessorService {
       });
     }
 
+    if (clientsToNoLoan.length > 0) {
+      await this.prisma.client.updateMany({
+        where: { id: { in: clientsToNoLoan } },
+        data: { status: 'NO_LOAN' },
+      });
+    }
+
     const result: OverdueProcessResult = {
       processedAt: new Date().toISOString(),
       todayReference: todayStr,
       updatedInstallmentsCount,
       markedDelinquentClientsCount: clientsToDelinquent.length,
       restoredCurrentClientsCount: clientsToCurrent.length,
+      restoredNoLoanClientsCount: clientsToNoLoan.length,
     };
 
     this.logger.log(
       `[OverdueProcessor] ✅ Recálculo completado exitosamente: ` +
         `${updatedInstallmentsCount} cuotas actualizadas, ` +
         `${clientsToDelinquent.length} clientes pasaron a MOROSO (DELINQUENT), ` +
-        `${clientsToCurrent.length} clientes restaurados AL DÍA (CURRENT).`,
+        `${clientsToCurrent.length} clientes restaurados AL DÍA (CURRENT), ` +
+        `${clientsToNoLoan.length} clientes restaurados a SIN CRÉDITO (NO_LOAN).`,
     );
 
     return result;

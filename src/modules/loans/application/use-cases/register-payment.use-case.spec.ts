@@ -88,6 +88,10 @@ describe('RegisterPaymentUseCase', () => {
   const mockPrismaService = {
     loan: {
       findFirst: jest.fn(),
+      count: jest.fn(),
+    },
+    client: {
+      update: jest.fn(),
     },
   };
 
@@ -207,6 +211,8 @@ describe('RegisterPaymentUseCase', () => {
   it('should complete loan when full balance is paid', async () => {
     const loan = createMockLoan();
     mockPrismaService.loan.findFirst.mockResolvedValue({ id: 'loan-1' });
+    mockPrismaService.loan.count.mockResolvedValue(0); // Sin préstamos activos restantes
+    mockPrismaService.client.update.mockResolvedValue({});
     mockLoanRepository.findByIdWithPendingInstallments.mockResolvedValue(loan);
 
     const input: RegisterPaymentInput = {
@@ -227,6 +233,72 @@ describe('RegisterPaymentUseCase', () => {
     expect(result.affectedInstallments[1].newStatus).toBe(
       InstallmentStatus.PAID,
     );
+  });
+
+  it('should update client to NO_LOAN when last active loan is completed by a payment', async () => {
+    const loan = createMockLoan();
+    mockPrismaService.loan.findFirst.mockResolvedValue({ id: 'loan-1' });
+    mockPrismaService.loan.count.mockResolvedValue(0); // No quedan préstamos activos
+    mockPrismaService.client.update.mockResolvedValue({});
+    mockLoanRepository.findByIdWithPendingInstallments.mockResolvedValue(loan);
+
+    const input: RegisterPaymentInput = {
+      loanId: 'loan-1',
+      amount: 800,
+      method: 'cash',
+      paymentDate: '2026-08-19',
+    };
+
+    await useCase.execute('user-1', input);
+
+    // Verifica que se excluye el préstamo recién completado del count
+    expect(mockPrismaService.loan.count).toHaveBeenCalledWith({
+      where: { clientId: 'client-1', status: 'ACTIVE', id: { not: 'loan-1' } },
+    });
+    expect(mockPrismaService.client.update).toHaveBeenCalledWith({
+      where: { id: 'client-1' },
+      data: { status: 'NO_LOAN' },
+    });
+  });
+
+  it('should NOT update client status when loan is completed but other active loans remain', async () => {
+    const loan = createMockLoan();
+    mockPrismaService.loan.findFirst.mockResolvedValue({ id: 'loan-1' });
+    mockPrismaService.loan.count.mockResolvedValue(1); // Todavía tiene otro préstamo activo
+    mockPrismaService.client.update.mockResolvedValue({});
+    mockLoanRepository.findByIdWithPendingInstallments.mockResolvedValue(loan);
+
+    const input: RegisterPaymentInput = {
+      loanId: 'loan-1',
+      amount: 800,
+      method: 'cash',
+      paymentDate: '2026-08-19',
+    };
+
+    await useCase.execute('user-1', input);
+
+    expect(mockPrismaService.client.update).not.toHaveBeenCalled();
+  });
+
+  it('should NOT update client status for a partial payment (loan still ACTIVE)', async () => {
+    const loan = createMockLoan();
+    mockPrismaService.loan.findFirst.mockResolvedValue({ id: 'loan-1' });
+    mockPrismaService.loan.count.mockResolvedValue(0);
+    mockPrismaService.client.update.mockResolvedValue({});
+    mockLoanRepository.findByIdWithPendingInstallments.mockResolvedValue(loan);
+
+    const input: RegisterPaymentInput = {
+      loanId: 'loan-1',
+      amount: 400, // Pago parcial — préstamo sigue ACTIVE
+      method: 'cash',
+      paymentDate: '2026-08-19',
+    };
+
+    await useCase.execute('user-1', input);
+
+    // count no debe llamarse porque el loan sigue ACTIVE
+    expect(mockPrismaService.loan.count).not.toHaveBeenCalled();
+    expect(mockPrismaService.client.update).not.toHaveBeenCalled();
   });
 
   it('should throw NotFoundException if loan does not exist or does not belong to user', async () => {

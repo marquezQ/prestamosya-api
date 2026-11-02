@@ -86,6 +86,7 @@ describe('OverdueProcessorService', () => {
     expect(result.updatedInstallmentsCount).toBe(1);
     expect(result.markedDelinquentClientsCount).toBe(1);
     expect(result.restoredCurrentClientsCount).toBe(0);
+    expect(result.restoredNoLoanClientsCount).toBe(0);
 
     expect(mockPrismaService.installment.update).toHaveBeenCalledWith({
       where: { id: 'inst-1' },
@@ -110,7 +111,7 @@ describe('OverdueProcessorService', () => {
     // No hay cuotas pendientes vencidas
     mockPrismaService.installment.findMany.mockResolvedValue([]);
 
-    // Cliente está DELINQUENT pero ya no tiene cuotas vencidas
+    // Cliente está DELINQUENT pero ya no tiene cuotas vencidas (tiene préstamo activo sin mora)
     mockPrismaService.client.findMany.mockResolvedValue([
       {
         id: 'client-1',
@@ -132,10 +133,76 @@ describe('OverdueProcessorService', () => {
     expect(result.updatedInstallmentsCount).toBe(0);
     expect(result.markedDelinquentClientsCount).toBe(0);
     expect(result.restoredCurrentClientsCount).toBe(1);
+    expect(result.restoredNoLoanClientsCount).toBe(0);
 
     expect(mockPrismaService.client.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ['client-1'] } },
       data: { status: 'CURRENT' },
+    });
+  });
+
+  it('should restore CURRENT client to NO_LOAN when all their loans are completed', async () => {
+    mockPrismaService.businessConfig.findMany.mockResolvedValue([
+      { userId: 'user-1', graceDays: 0 },
+    ]);
+
+    const referenceDate = new Date('2026-08-20T12:00:00.000Z');
+    mockPrismaService.installment.findMany.mockResolvedValue([]);
+
+    // Cliente CURRENT sin ningún préstamo activo (el único préstamo fue completado)
+    mockPrismaService.client.findMany.mockResolvedValue([
+      {
+        id: 'client-1',
+        userId: 'user-1',
+        status: 'CURRENT',
+        loans: [], // No tiene préstamos ACTIVE
+      },
+    ]);
+
+    mockPrismaService.client.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.processOverdue(referenceDate);
+
+    expect(result.updatedInstallmentsCount).toBe(0);
+    expect(result.markedDelinquentClientsCount).toBe(0);
+    expect(result.restoredCurrentClientsCount).toBe(0);
+    expect(result.restoredNoLoanClientsCount).toBe(1);
+
+    expect(mockPrismaService.client.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['client-1'] } },
+      data: { status: 'NO_LOAN' },
+    });
+  });
+
+  it('should restore DELINQUENT client to NO_LOAN when all their loans are completed', async () => {
+    mockPrismaService.businessConfig.findMany.mockResolvedValue([
+      { userId: 'user-1', graceDays: 0 },
+    ]);
+
+    const referenceDate = new Date('2026-08-20T12:00:00.000Z');
+    mockPrismaService.installment.findMany.mockResolvedValue([]);
+
+    // Cliente DELINQUENT sin ningún préstamo activo
+    mockPrismaService.client.findMany.mockResolvedValue([
+      {
+        id: 'client-2',
+        userId: 'user-1',
+        status: 'DELINQUENT',
+        loans: [], // Todos sus préstamos terminaron
+      },
+    ]);
+
+    mockPrismaService.client.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.processOverdue(referenceDate);
+
+    expect(result.restoredNoLoanClientsCount).toBe(1);
+    expect(result.restoredCurrentClientsCount).toBe(0);
+    expect(result.markedDelinquentClientsCount).toBe(0);
+
+    expect(mockPrismaService.client.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['client-2'] } },
+      data: { status: 'NO_LOAN' },
     });
   });
 });

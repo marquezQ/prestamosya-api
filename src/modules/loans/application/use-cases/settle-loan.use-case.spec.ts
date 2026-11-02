@@ -86,6 +86,10 @@ describe('SettleLoanUseCase', () => {
   const mockPrismaService = {
     loan: {
       findFirst: jest.fn(),
+      count: jest.fn(),
+    },
+    client: {
+      update: jest.fn(),
     },
   };
 
@@ -253,5 +257,38 @@ describe('SettleLoanUseCase', () => {
     await expect(useCase.execute('user-1', validSettleInput)).rejects.toThrow(
       LoanNotActiveError,
     );
+  });
+
+  it('should update client status to NO_LOAN when no active loans remain after settlement', async () => {
+    mockPrismaService.loan.findFirst.mockResolvedValue({ id: 'loan-1' });
+    mockPrismaService.loan.count.mockResolvedValue(0); // No quedan préstamos activos
+    mockPrismaService.client.update.mockResolvedValue({});
+
+    const loan = createMockLoan({ outstandingBalance: 800 });
+    mockLoanRepository.findByIdWithPendingInstallments.mockResolvedValue(loan);
+
+    await useCase.execute('user-1', validSettleInput);
+
+    // Verifica que se excluye el préstamo recién completado del count
+    expect(mockPrismaService.loan.count).toHaveBeenCalledWith({
+      where: { clientId: 'client-1', status: 'ACTIVE', id: { not: 'loan-1' } },
+    });
+    expect(mockPrismaService.client.update).toHaveBeenCalledWith({
+      where: { id: 'client-1' },
+      data: { status: 'NO_LOAN' },
+    });
+  });
+
+  it('should NOT update client status to NO_LOAN when other active loans remain after settlement', async () => {
+    mockPrismaService.loan.findFirst.mockResolvedValue({ id: 'loan-1' });
+    mockPrismaService.loan.count.mockResolvedValue(1); // Todavía tiene otro préstamo activo
+    mockPrismaService.client.update.mockResolvedValue({});
+
+    const loan = createMockLoan({ outstandingBalance: 800 });
+    mockLoanRepository.findByIdWithPendingInstallments.mockResolvedValue(loan);
+
+    await useCase.execute('user-1', validSettleInput);
+
+    expect(mockPrismaService.client.update).not.toHaveBeenCalled();
   });
 });
