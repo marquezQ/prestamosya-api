@@ -34,6 +34,14 @@ export class ClientResponseDto {
   @ApiPropertyOptional({ example: 'Prefiere cobro por las mañanas.' })
   notes: string | null;
 
+  @ApiPropertyOptional({
+    example:
+      'https://res.cloudinary.com/demo/image/upload/v123/photos/abc123/clients/photo.webp',
+    description:
+      'URL pública de la foto del cliente en Cloudinary. null si no tiene foto.',
+  })
+  photoUrl: string | null;
+
   @ApiProperty({ example: '2026-07-21T00:00:00.000Z' })
   createdAt: Date;
 

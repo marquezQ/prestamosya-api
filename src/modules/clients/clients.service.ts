@@ -5,12 +5,19 @@ import {
 } from '@nestjs/common';
 import { GuaranteeStatus, LoanStatus } from '../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CloudinaryService } from '../../common/cloudinary/cloudinary.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
+/** Carpeta base en Cloudinary para fotos de clientes. Estructura: photos/{userId}/clients/ */
+const CLOUDINARY_CLIENTS_FOLDER = 'photos';
+
 @Injectable()
 export class ClientsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cloudinary: CloudinaryService,
+  ) {}
 
   async findAll(userId: string) {
     const clients = await this.prisma.client.findMany({
@@ -29,7 +36,12 @@ export class ClientsService {
     };
   }
 
-  async create(userId: string, dto: CreateClientDto) {
+  async create(userId: string, dto: CreateClientDto, imageBuffer?: Buffer) {
+    // Si viene imagen, subirla a Cloudinary ANTES de tocar la BD
+    const photoUrl = imageBuffer
+      ? await this.uploadClientPhoto(imageBuffer, userId)
+      : null;
+
     try {
       const client = await this.prisma.client.create({
         data: {
@@ -42,6 +54,7 @@ export class ClientsService {
           latitude: dto.latitude,
           longitude: dto.longitude,
           notes: dto.notes,
+          photoUrl,
         },
       });
 
@@ -103,8 +116,18 @@ export class ClientsService {
     };
   }
 
-  async update(userId: string, id: string, dto: UpdateClientDto) {
+  async update(
+    userId: string,
+    id: string,
+    dto: UpdateClientDto,
+    imageBuffer?: Buffer,
+  ) {
     await this.getActiveClient(userId, id);
+
+    // Si viene imagen, subirla a Cloudinary ANTES de tocar la BD
+    const photoUrl = imageBuffer
+      ? await this.uploadClientPhoto(imageBuffer, userId)
+      : undefined; // undefined = no cambiar el campo en BD
 
     try {
       const client = await this.prisma.client.update({
@@ -118,6 +141,7 @@ export class ClientsService {
           ...(dto.latitude !== undefined && { latitude: dto.latitude }),
           ...(dto.longitude !== undefined && { longitude: dto.longitude }),
           ...(dto.notes !== undefined && { notes: dto.notes }),
+          ...(photoUrl !== undefined && { photoUrl }),
         },
       });
 
@@ -218,6 +242,7 @@ export class ClientsService {
     longitude: { toString(): string } | null;
     status: string;
     notes: string | null;
+    photoUrl: string | null;
     createdAt: Date;
     updatedAt: Date;
   }) {
@@ -234,6 +259,7 @@ export class ClientsService {
         : null,
       status: client.status,
       notes: client.notes,
+      photoUrl: client.photoUrl,
       createdAt: client.createdAt,
       updatedAt: client.updatedAt,
     };
@@ -252,5 +278,16 @@ export class ClientsService {
     ) {
       throw new ConflictException('ID number already exists');
     }
+  }
+
+  /**
+   * Sube la foto de perfil del cliente a Cloudinary.
+   * Carpeta: photos/{userId}/clients/
+   */
+  private uploadClientPhoto(buffer: Buffer, userId: string): Promise<string> {
+    return this.cloudinary.uploadImage(
+      buffer,
+      `${CLOUDINARY_CLIENTS_FOLDER}/${userId}/clients`,
+    );
   }
 }

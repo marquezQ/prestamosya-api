@@ -144,7 +144,8 @@ export class NotificationsService {
    * Resumen diario 8AM America/La_Paz a cada admin activo.
    * Canal in-app SIEMPRE (fiable, persiste en BD).
    * Canal push Expo best-effort OPCIONAL (no rompe el flujo si falla).
-   * Se envía SIEMPRE, aunque los contadores sean 0.
+   * Se envía SOLO si dueTodayCount >= 1 ó overdueClients >= 1.
+   * Admins sin actividad se omiten para no generar ruido.
    */
   async sendDailySummaries(): Promise<DailySummaryDeliveryResult[]> {
     const admins = await this.prisma.user.findMany({
@@ -165,6 +166,14 @@ export class NotificationsService {
         const overdueClients = dashboard?.overdue
           ? new Set(dashboard.overdue.map((i) => i.clientId)).size
           : 0;
+
+        // Solo notificar si hay algo relevante para el admin
+        if (dueTodayCount === 0 && overdueClients === 0) {
+          this.logger.log(
+            `[Resumen] admin=${admin.id} sin cobros ni mora — omitido`,
+          );
+          continue;
+        }
 
         const title = 'Resumen diario';
         const body = `${dueTodayCount} cobro(s) para hoy · ${overdueClients} cliente(s) en mora`;

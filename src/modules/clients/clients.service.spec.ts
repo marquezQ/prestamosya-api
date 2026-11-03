@@ -1,5 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 
+import { CloudinaryService } from '../../common/cloudinary/cloudinary.service';
 import { ClientsService } from './clients.service';
 import {
   createPrismaMock,
@@ -8,17 +9,19 @@ import {
 } from '../../testing/prisma.mock';
 
 /**
- * Unit tests de ClientsService: se inyecta un mock de Prisma (sin BD) para
- * probar solo la lógica del service.
+ * Unit tests de ClientsService: se inyecta un mock de Prisma (sin BD) y un
+ * mock de CloudinaryService para probar solo la lógica del service.
  *
  * Casos clave:
  * - `findAll()` agrega `activeLoanCount` consultando los préstamos activos.
  * - `findOne()` separa los préstamos en `activeLoans` y `completedLoans` sin
  *   arrastrar cuotas, y no expone resumen financiero.
+ * - `create()` / `update()` suben foto a Cloudinary si se recibe buffer.
  */
 describe('ClientsService', () => {
   let service: ClientsService;
   let prismaMock: ReturnType<typeof createPrismaMock>;
+  let cloudinaryMock: { uploadImage: jest.Mock };
 
   /** Utilidad: convierte un número en un objeto con `.toString()` (simula Decimal de Prisma). */
   const dec = (n: number) => ({ toString: () => n.toFixed(2) });
@@ -36,6 +39,7 @@ describe('ClientsService', () => {
     longitude: dec(-68.1342),
     status: 'CURRENT',
     notes: 'Prefiere mañanas',
+    photoUrl: null,
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-01-02'),
   };
@@ -50,6 +54,7 @@ describe('ClientsService', () => {
         description: 'Toyota',
         estimatedValue: dec(15000),
         status: 'IN_USE',
+        photos: [],
         createdAt: new Date('2026-01-01'),
       },
     ],
@@ -87,9 +92,18 @@ describe('ClientsService', () => {
     ],
   };
 
+  const FAKE_PHOTO_URL =
+    'https://res.cloudinary.com/demo/photos/user-1/clients/photo.webp';
+
   beforeEach(() => {
     prismaMock = createPrismaMock();
-    service = new ClientsService(prismaServiceOf(prismaMock));
+    cloudinaryMock = {
+      uploadImage: jest.fn().mockResolvedValue(FAKE_PHOTO_URL),
+    };
+    service = new ClientsService(
+      prismaServiceOf(prismaMock),
+      cloudinaryMock as unknown as CloudinaryService,
+    );
   });
 
   afterEach(() => {
@@ -150,6 +164,47 @@ describe('ClientsService', () => {
         }),
       ).rejects.toThrow(ConflictException);
     });
+
+    it('crea cliente sin foto cuando no se recibe buffer', async () => {
+      prismaMock.client.create.mockResolvedValue(baseClient);
+
+      const result = await service.create('user-1', {
+        fullName: 'Ana',
+        phone: '71234567',
+        idNumber: '5555555 LP',
+      });
+
+      expect(cloudinaryMock.uploadImage).not.toHaveBeenCalled();
+      // Verificar que el campo photoUrl llegó como null al create de Prisma
+      const createCall = lastCallArg<{ data: { photoUrl: string | null } }>(
+        prismaMock.client.create,
+      );
+      expect(createCall.data.photoUrl).toBeNull();
+      expect(result.data.photoUrl).toBeNull();
+    });
+
+    it('sube la foto a Cloudinary y guarda la URL cuando se recibe buffer', async () => {
+      const clientWithPhoto = { ...baseClient, photoUrl: FAKE_PHOTO_URL };
+      prismaMock.client.create.mockResolvedValue(clientWithPhoto);
+      const fakeBuffer = Buffer.from('fake-image');
+
+      const result = await service.create(
+        'user-1',
+        { fullName: 'Ana', phone: '71234567', idNumber: '5555555 LP' },
+        fakeBuffer,
+      );
+
+      expect(cloudinaryMock.uploadImage).toHaveBeenCalledWith(
+        fakeBuffer,
+        'photos/user-1/clients',
+      );
+      // Verificar que el campo photoUrl llegó con la URL al create de Prisma
+      const createCall = lastCallArg<{ data: { photoUrl: string | null } }>(
+        prismaMock.client.create,
+      );
+      expect(createCall.data.photoUrl).toBe(FAKE_PHOTO_URL);
+      expect(result.data.photoUrl).toBe(FAKE_PHOTO_URL);
+    });
   });
 
   describe('update()', () => {
@@ -172,6 +227,44 @@ describe('ClientsService', () => {
       await expect(
         service.update('user-1', 'client-1', { idNumber: '1111111' }),
       ).rejects.toThrow(ConflictException);
+    });
+
+    it('no sube foto a Cloudinary cuando no se recibe buffer', async () => {
+      prismaMock.client.findFirst.mockResolvedValue(multiLoanClient);
+      prismaMock.client.update.mockResolvedValue(multiLoanClient);
+
+      await service.update('user-1', 'client-1', { fullName: 'Nuevo' });
+
+      expect(cloudinaryMock.uploadImage).not.toHaveBeenCalled();
+      // photoUrl no debe estar en el payload de update
+      const updateCall = lastCallArg<{ data: Record<string, unknown> }>(
+        prismaMock.client.update,
+      );
+      expect(updateCall.data).not.toHaveProperty('photoUrl');
+    });
+
+    it('sube la foto y añade photoUrl al payload de update cuando se recibe buffer', async () => {
+      const clientWithPhoto = { ...baseClient, photoUrl: FAKE_PHOTO_URL };
+      prismaMock.client.findFirst.mockResolvedValue(baseClient);
+      prismaMock.client.update.mockResolvedValue(clientWithPhoto);
+      const fakeBuffer = Buffer.from('new-photo');
+
+      const result = await service.update(
+        'user-1',
+        'client-1',
+        { fullName: 'Nuevo' },
+        fakeBuffer,
+      );
+
+      expect(cloudinaryMock.uploadImage).toHaveBeenCalledWith(
+        fakeBuffer,
+        'photos/user-1/clients',
+      );
+      const updateCall = lastCallArg<{ data: Record<string, unknown> }>(
+        prismaMock.client.update,
+      );
+      expect(updateCall.data).toHaveProperty('photoUrl', FAKE_PHOTO_URL);
+      expect(result.data.photoUrl).toBe(FAKE_PHOTO_URL);
     });
   });
 
@@ -255,6 +348,17 @@ describe('ClientsService', () => {
       expect(result.data.guarantees).toHaveLength(1);
       expect(result.data.guarantees[0].estimatedValue).toBe(15000);
       expect(result.data.guarantees[0].status).toBe('IN_USE');
+    });
+
+    it('expone photoUrl en el perfil del cliente', async () => {
+      prismaMock.client.findFirst.mockResolvedValue({
+        ...multiLoanClient,
+        photoUrl: FAKE_PHOTO_URL,
+      });
+
+      const result = await service.findOne('user-1', 'client-1');
+
+      expect(result.data.client.photoUrl).toBe(FAKE_PHOTO_URL);
     });
 
     it('no expone resumen financiero', async () => {

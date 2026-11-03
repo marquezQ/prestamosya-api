@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsNumber,
   IsNotEmpty,
@@ -41,6 +42,7 @@ export class CreateClientDto {
 
   @ApiPropertyOptional({ default: -16.5001 })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 8 })
   @Min(-90)
   @Max(90)
@@ -48,6 +50,7 @@ export class CreateClientDto {
 
   @ApiPropertyOptional({ default: -68.1342 })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 8 })
   @Min(-180)
   @Max(180)
@@ -57,4 +60,13 @@ export class CreateClientDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  /**
+   * Foto del cliente (multipart/form-data). Opcional.
+   * Procesada por FileInterceptor — el DTO solo declara el campo
+   * para que Swagger lo muestre correctamente.
+   */
+  @ApiPropertyOptional({ type: 'string', format: 'binary' })
+  @IsOptional()
+  image?: unknown;
 }

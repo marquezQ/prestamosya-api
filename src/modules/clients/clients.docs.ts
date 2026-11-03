@@ -1,18 +1,31 @@
 import { applyDecorators, HttpStatus } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import {
-  ClientResponseDto,
   ClientListResponseDto,
   ClientProfileResponseDto,
+  ClientResponseDto,
 } from './dto/client-response.dto';
+
+/** Aplica @ApiTags('clients') al controller — centraliza toda la configuración Swagger aquí. */
+export function ApiClientsTag() {
+  return applyDecorators(ApiTags('clients'));
+}
 
 export function ApiCreateClientDoc() {
   return applyDecorators(
+    ApiConsumes('multipart/form-data'),
     ApiOperation({
       summary: 'Create a client',
-      description: 'Registers a new client in the system.',
+      description:
+        'Registers a new client. Accepts multipart/form-data to allow an optional profile photo.',
     }),
     ApiBody({ type: CreateClientDto }),
     ApiResponse({
@@ -68,9 +81,11 @@ export function ApiFindOneClientDoc() {
 
 export function ApiUpdateClientDoc() {
   return applyDecorators(
+    ApiConsumes('multipart/form-data'),
     ApiOperation({
       summary: 'Update client',
-      description: 'Updates one or more fields of a client.',
+      description:
+        'Updates one or more fields of a client. Accepts multipart/form-data to allow updating the profile photo.',
     }),
     ApiBody({ type: UpdateClientDto }),
     ApiResponse({
