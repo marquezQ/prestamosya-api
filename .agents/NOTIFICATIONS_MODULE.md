@@ -118,8 +118,9 @@ Todas las rutas requieren cabecera `Authorization: Bearer <JWT_TOKEN>`.
 - **Procesamiento:**
   1. Identifica a todos los usuarios activos con `role = admin`.
   2. Consulta el estado del Dashboard del día actual (`dueTodayCount` y `overdueClients`).
-  3. Crea una entrada en la tabla `notifications` (canal in-app).
-  4. Busca los `device_tokens` registrados para cada admin y envía la notificación push a Expo.
+  3. **Filtro de Actividad:** Si `dueTodayCount === 0 && overdueClients === 0`, el admin se omite silenciosamente y no se genera notificación ni in-app ni push (evita spam o alertas vacías).
+  4. Si hay actividad (`dueTodayCount >= 1 || overdueClients >= 1`), crea una entrada en la tabla `notifications` (canal in-app fiable).
+  5. Busca los `device_tokens` registrados para cada admin y envía la notificación push a Expo.
 
 ---
 

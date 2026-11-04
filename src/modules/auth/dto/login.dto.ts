@@ -1,5 +1,6 @@
 // src/modules/auth/dto/login.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsString, MinLength } from 'class-validator';
 
 export class LoginDto {
@@ -7,6 +8,9 @@ export class LoginDto {
     description: 'Nombre de usuario',
     default: 'admin',
   })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
   @IsNotEmpty()
   username: string;

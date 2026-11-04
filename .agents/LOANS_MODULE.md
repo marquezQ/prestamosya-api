@@ -96,10 +96,11 @@ Las siguientes fases deben desarrollarse para dar por concluido completamente el
 ### Fase 8b: Liquidación Anticipada con Condonación de Interés (`SettleLoanUseCase`) ✅ IMPLEMENTADO
 - **`POST /api/payments/settle`**: Cierra un préstamo antes de su vencimiento aceptando dinero físico real (`amount`) e interés condonado (`discount`).
 - **Invariante Crítico**: `LoanEntity.totalAmount` es `readonly` e inmutable. El contrato original no cambia, permitiendo mantener estadísticas exactas. `discount` se guarda en `payment.discountAmount`.
-- **Regla Dominio**: `amount + discount` debe ser **exactamente igual** al `outstandingBalance`. El préstamo pasa a `COMPLETED`.
+- **Regla Dominio (Protección de Capital)**: `amount + discount` debe ser **exactamente igual** al `outstandingBalance`. Adicionalmente, `discount <= loan.totalPendingInterest`. Si el descuento supera el interés pendiente de las cuotas no pagadas, se lanza `DiscountExceedsPendingInterestError` (HTTP 400), impidiendo que se descuente dinero prestado (capital).
+- **Patrón Post-Commit de Transacción**: Las actualizaciones de estado del cliente (`NO_LOAN`) en `RegisterPaymentUseCase` y `SettleLoanUseCase` se ejecutan **fuera del callback de `UnitOfWork.execute()`** mediante un DTO interno `TxResult` fuertemente tipado. Esto garantiza que la transacción financiera principal haga commit y libere su conexión de BD antes de ejecutar la verificación de otros préstamos activos (`id: { not: loanId }`), resolviendo violaciones de atomicidad y bloqueos por lecturas sucias.
 
 ### Fase 10: Cron Job de Mora y Recálculo Manual ✅ IMPLEMENTADO
-- **`OverdueProcessorService`**: Servicio centralizado que calcula de forma idempotente las cuotas vencidas (`dueDate < hoy - graceDays`), actualiza `daysOverdue`, pasa cuotas sin pagar a `OVERDUE`, y conmuta el estado de los clientes entre `CURRENT` y `DELINQUENT`.
+- **`OverdueProcessorService`**: Servicio centralizado que calcula de forma idempotente las cuotas vencidas (`dueDate < hoy - graceDays`), actualiza `daysOverdue`, pasa cuotas sin pagar a `OVERDUE`, y conmuta el estado de los clientes entre `CURRENT` y `DELINQUENT`. Además, si un cliente no tiene ningún préstamo activo (`loans.length === 0`), lo restaura a `NO_LOAN` automáticamente (`restoredNoLoanClientsCount`).
 - **`OverdueCron`**: Tarea programada `@nestjs/schedule` con `@Cron('0 6 * * *', { timeZone: 'America/La_Paz' })` ejecutada automáticamente todos los días a las 6:00 AM.
 - **`CronController` (`POST /api/admin/recalculate-overdue`)**: Endpoint de respaldo administrativo para forzar la actualización síncrona en cualquier momento.
 - **Zona Horaria Global**: Proceso Node configurado con `process.env.TZ = 'America/La_Paz'` en `main.ts` y utilidades de fecha en `src/common/utils/date.utils.ts`.
@@ -111,7 +112,7 @@ Las siguientes fases deben desarrollarse para dar por concluido completamente el
 - **Simulación y Creación**: Soporte completo en `POST /api/loans/simulate` y `POST /api/loans` pasando `scheduleType: 'INTEREST_ONLY'`. Es opcional; si se omite, asume `EQUAL_INSTALLMENTS` para retrocompatibilidad total.
 
 ### Testing del Módulo
-- Se cuenta con **172 tests unitarios aislados** (`20 test suites` en verde) verificando recálculo diario, idempotencia, estados de cliente, flujo de mora, liquidación anticipada, cálculo de cronogramas `INTEREST_ONLY` y dashboard de pagos.
+- Se cuenta con **197 tests unitarios aislados** (`20 test suites` en verde) verificando recálculo diario, idempotencia, estados de cliente (incluyendo restauración a `NO_LOAN`), flujo de mora, liquidación anticipada con validación de interés pendiente, cálculo de cronogramas `INTEREST_ONLY`, carga de fotos a Cloudinary y dashboard de pagos.
 
 ---
 

@@ -52,14 +52,19 @@ PATCH  /api/business-config        → BusinessConfigResponseDto (actualización
 ## Clients
 
 ```
-GET    /api/clients               → Client[] (cada item incluye activeLoanCount; status = ClientStatus del DB)
-POST   /api/clients               → Client
-GET    /api/clients/:id           → ClientProfile { client, activeLoans[], completedLoans[], guarantees[ con imageUrl ] }
-PATCH  /api/clients/:id           → Client
+GET    /api/clients               → Client[] (cada item incluye activeLoanCount y photoUrl; status = ClientStatus del DB)
+POST   /api/clients               → Client (multipart/form-data con imagen opcional 'image')
+GET    /api/clients/:id           → ClientProfile { client con photoUrl, activeLoans[], completedLoans[], guarantees[ con imageUrl ] }
+PATCH  /api/clients/:id           → Client (multipart/form-data con imagen opcional 'image')
 DELETE /api/clients/:id           → 200 OK (soft delete)
 ```
 
-> **Perfil de cliente (`GET /api/clients/:id`):** los préstamos se agrupan en `activeLoans` (`status: ACTIVE`) y `completedLoans` (`COMPLETED` | `DEFAULTED` | `REFINANCED`). Cada garantía incluye su campo `imageUrl: string | null`, ideal para renderizar de inmediato la foto/miniatura en las tarjetas (cards) de garantía sin hacer peticiones adicionales.
+> **Perfil y Listado de Clientes:**
+> - `POST /api/clients` y `PATCH /api/clients/:id` aceptan `multipart/form-data`.
+> - El campo de archivo es `image` (**opcional**).
+> - Backend procesa con `sharp`, optimiza a WebP (máx 800x800 px) y almacena en Cloudinary bajo la ruta: `photos/{userId}/clients/`.
+> - Todas las respuestas (`findAll`, `findOne`, `create`, `update`) retornan el campo `photoUrl: string | null`.
+> - Los préstamos del cliente se agrupan en `activeLoans` (`status: ACTIVE`) y `completedLoans` (`COMPLETED` | `DEFAULTED` | `REFINANCED`). Cada garantía incluye su campo `imageUrl: string | null`.
 
 ---
 

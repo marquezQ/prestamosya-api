@@ -14,9 +14,11 @@ export class AuthService {
   ) {}
 
   async login(dto: LoginDto): Promise<AuthResponseDto> {
+    const username = dto.username?.trim();
+
     // Buscar usuario y validar si está activo
     const user = await this.prisma.user.findUnique({
-      where: { username: dto.username },
+      where: { username },
     });
 
     if (!user || !user.isActive) {

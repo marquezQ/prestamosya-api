@@ -66,8 +66,25 @@ async checkOverdueInstallments() {
 **Reglas:**
 - Una cuota pasa a `OVERDUE` cuando: `dueDate < hoy - graceDays` Y estado != `PAID`
 - `daysOverdue` = diferencia en días entre hoy y `dueDate`
-- Un cliente pasa a `MOROSO` si tiene **al menos 1 cuota `OVERDUE`**
-- Un cliente vuelve a `AL_DIA` automáticamente cuando no tiene cuotas `OVERDUE`
+- Un cliente pasa a `MOROSO` (`DELINQUENT`) si tiene **al menos 1 cuota `OVERDUE`**
+- Un cliente vuelve a `AL_DIA` (`CURRENT`) automáticamente cuando no tiene cuotas `OVERDUE` pero mantiene préstamos activos
+- Un cliente pasa a `NO_LOAN` automáticamente cuando **no tiene préstamos activos** (`loans.length === 0`), tanto si estaba en `CURRENT` como en `DELINQUENT` (mecanismo de auto-recuperación)
+
+---
+
+## Liquidación Anticipada y Condonación de Interés
+
+- **Solo interés futuro no devengado:** El descuento (`discount`) representa exclusivamente condonación de interés pendiente. **Bajo ningún concepto se puede descontar capital prestado**.
+- **Invariante de Dominio:** `discountAmount <= loan.totalPendingInterest`. Si el usuario intenta aplicar un descuento superior al total de interés no pagado de las cuotas pendientes, el sistema rechaza la operación con `DiscountExceedsPendingInterestError` (HTTP 400).
+- **Cobertura exacta:** `amount + discount == loan.outstandingBalance`.
+- **Transaccionalidad limpia (Post-Commit):** Al liquidarse o saldarse el último préstamo activo de un cliente, la actualización del estado del cliente a `NO_LOAN` se ejecuta **después de que la transacción de pago/liquidación (`UnitOfWork.execute`) haga COMMIT**. Se excluye explícitamente el préstamo actual (`id: { not: loanId }`) para evitar lecturas sucias antes de persistir, preservando la atomicidad y evitando bloqueos del pool de conexiones.
+
+---
+
+## Notificaciones Automáticas (Resumen Matutino 8:00 AM)
+
+- El cron de las 8:00 AM (`America/La_Paz`) evalúa el estado del día (`dueTodayCount` y `overdueClients`).
+- **Filtro de actividad:** Solo se despacha la notificación (in-app y push) si `dueTodayCount >= 1 || overdueClients >= 1`. Si ambos contadores son 0, se omite silenciosamente para no generar ruido innecesario al administrador.
 
 ---
 

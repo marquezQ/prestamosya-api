@@ -116,6 +116,7 @@ model Client {
   longitude  Decimal?     @db.Decimal(11, 8)
   status     ClientStatus @default(NO_LOAN)
   notes      String?
+  photoUrl   String?      @map("photo_url") @db.VarChar(500)
   deletedAt  DateTime?    @db.Timestamptz(3) @map("deleted_at")
   createdAt  DateTime     @default(now()) @db.Timestamptz(3) @map("created_at")
   updatedAt  DateTime     @updatedAt @db.Timestamptz(3) @map("updated_at")
@@ -386,6 +387,9 @@ pnpm exec prisma migrate resolve --applied 20260911023000_restructure_payment_in
 pnpm exec prisma migrate resolve --applied 20260911032000_backfill_historical_payment_installments
 pnpm exec prisma migrate resolve --applied 20260911033000_fix_backfill_payment_installments
 pnpm exec prisma migrate resolve --applied 20260914144933_add_cascade_delete_loan_relations
+pnpm exec prisma migrate resolve --applied 20260920233216_add_notifications
+pnpm exec prisma migrate resolve --applied 20261007192232_add_completed_at_to_loan
+pnpm exec prisma migrate resolve --applied 20261103010000_add_client_photo_url
 ```
 
 **Resultado:** Prisma creará la tabla `_prisma_migrations`, registrará las migraciones en el historial sin tocar ninguna fila existente, y desbloqueará inmediatamente el CI/CD de GitHub Actions.
