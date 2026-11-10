@@ -64,7 +64,8 @@ La primera etapa de construcción estableció los cimientos y el flujo completo 
 - **`LinkGuaranteeUseCase`**: Vincula una garantía `AVAILABLE` a un préstamo (`POST /api/loans/:id/guarantees`). Marca la garantía como `IN_USE` y la vinculación como `ACTIVE`. Impide doble vinculación.
 - **`UnlinkGuaranteeUseCase`**: Desvincula la garantía (`DELETE /api/loans/:id/guarantees/:guaranteeId`), devuelve la garantía a `AVAILABLE` y marca el link como `RELEASED`.
 
-### Fase 7: Detalle del Préstamo y Consultas (`GetLoanDetailUseCase`)
+### Fase 7: Consultas de Cartera y Detalle (`ListLoansUseCase` & `GetLoanDetailUseCase`)
+- **`GET /api/loans`**: Lista centralizada de préstamos de la cartera del usuario con soporte de filtros (`filter=active|up_to_date|overdue|completed`) y búsqueda (`search`). Mapea indicadores de mora (`isDelinquent`, `overdueInstallmentsCount`), progreso de cuotas y próxima fecha de vencimiento (`nextDueDate`).
 - **`GET /api/loans/:id`**: Retorna la estructura completa del préstamo (`loan`, `installments`, `guarantees`, `payments`).
 - **`GET /api/loans/:id/installments`**: Retorna únicamente el cronograma de cuotas activas.
 
@@ -112,7 +113,7 @@ Las siguientes fases deben desarrollarse para dar por concluido completamente el
 - **Simulación y Creación**: Soporte completo en `POST /api/loans/simulate` y `POST /api/loans` pasando `scheduleType: 'INTEREST_ONLY'`. Es opcional; si se omite, asume `EQUAL_INSTALLMENTS` para retrocompatibilidad total.
 
 ### Testing del Módulo
-- Se cuenta con **197 tests unitarios aislados** (`20 test suites` en verde) verificando recálculo diario, idempotencia, estados de cliente (incluyendo restauración a `NO_LOAN`), flujo de mora, liquidación anticipada con validación de interés pendiente, cálculo de cronogramas `INTEREST_ONLY`, carga de fotos a Cloudinary y dashboard de pagos.
+- Se cuenta con **202 tests unitarios aislados** (`21 test suites` en verde) verificando recálculo diario, idempotencia, estados de cliente (incluyendo restauración a `NO_LOAN`), flujo de mora, liquidación anticipada con validación de interés pendiente, cálculo de cronogramas `INTEREST_ONLY`, listado y filtrado de cartera de préstamos (`ListLoansUseCase`), carga de fotos a Cloudinary y dashboard de pagos.
 
 ---
 

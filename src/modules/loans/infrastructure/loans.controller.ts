@@ -5,11 +5,11 @@ import {
   Get,
   Param,
   Post,
+  Query,
   BadRequestException,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { JwtPayload } from '../../auth/interfaces/jwt-payload.interface';
 import { CreateLoanUseCase } from '../application/use-cases/create-loan.use-case';
@@ -17,22 +17,26 @@ import { SimulateLoanUseCase } from '../application/use-cases/simulate-loan.use-
 import { LinkGuaranteeUseCase } from '../application/use-cases/link-guarantee.use-case';
 import { UnlinkGuaranteeUseCase } from '../application/use-cases/unlink-guarantee.use-case';
 import { GetLoanDetailUseCase } from '../application/use-cases/get-loan-detail.use-case';
+import { ListLoansUseCase } from '../application/use-cases/list-loans.use-case';
 import { CreateLoanDto } from '../dto/create-loan.dto';
 import { SimulateLoanDto } from '../dto/simulate-loan.dto';
 import { LinkGuaranteeDto } from '../dto/link-guarantee.dto';
+import { ListLoansQueryDto } from '../dto/list-loans.query.dto';
 import { LoanDomainError } from '../domain/errors/loan-domain.errors';
 import { LoanMapper } from './mappers/loan.mapper';
 import { InstallmentMapper } from './mappers/installment.mapper';
 import {
+  ApiLoansTag,
   ApiCreateLoanDoc,
   ApiSimulateLoanDoc,
   ApiLinkGuaranteeDoc,
   ApiUnlinkGuaranteeDoc,
   ApiGetLoanDetailDoc,
   ApiGetLoanInstallmentsDoc,
+  ApiListLoansDoc,
 } from '../loans.docs';
 
-@ApiTags('loans')
+@ApiLoansTag()
 @Controller('loans')
 export class LoansController {
   constructor(
@@ -41,7 +45,18 @@ export class LoansController {
     private readonly linkGuaranteeUseCase: LinkGuaranteeUseCase,
     private readonly unlinkGuaranteeUseCase: UnlinkGuaranteeUseCase,
     private readonly getLoanDetailUseCase: GetLoanDetailUseCase,
+    private readonly listLoansUseCase: ListLoansUseCase,
   ) {}
+
+  @Get()
+  @ApiListLoansDoc()
+  async findAll(
+    @CurrentUser() user: JwtPayload,
+    @Query() query: ListLoansQueryDto,
+  ) {
+    const data = await this.listLoansUseCase.execute(user.sub, query);
+    return { data };
+  }
 
   @Post()
   @ApiCreateLoanDoc()

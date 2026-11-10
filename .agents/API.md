@@ -98,6 +98,7 @@ DELETE /api/guarantees/:id                     → 200 OK (soft delete; bloquead
 ## Loans
 
 ```
+GET    /api/loans                             → LoanListItem[] (filtrable por status y búsqueda)
 POST   /api/loans                             → Loan + Installment[] generadas
 GET    /api/loans/:id                         → LoanDetail (con cuotas y pagos)
 GET    /api/loans/:id/installments            → Installment[]
@@ -105,6 +106,12 @@ POST   /api/loans/:id/guarantees              → LoanGuarantee (vincular garant
 DELETE /api/loans/:id/guarantees/:guaranteeId → 200 OK (desvincular)
 ```
 
+> **Listado de Préstamos de la Cartera (`GET /api/loans`):**
+> - **Query params opcionales:**
+>   - `filter`: `'active'` (default, todos los activos), `'up_to_date'` (al día sin mora), `'overdue'` (en mora con cuotas vencidas), `'completed'` (finalizados o liquidados).
+>   - `search`: string para búsqueda insensible por nombre o carnet (CI) del cliente.
+> - **Respuesta optimizada:** Cada item incluye el resumen financiero del préstamo, cliente (`id`, `fullName`, `idNumber`, `phone`, `photoUrl`), estado de mora (`isDelinquent`), avance (`paidInstallments`, `totalInstallments`, `overdueInstallmentsCount`) y próxima cuota a vencer (`nextDueDate`).
+>
 > **Bodies de create/simulate:**
 > - El campo `firstDueDate` NO se envía. El body usa `startDate` (fecha de desembolso, YYYY-MM-DD) y el backend calcula la primera cuota como `startDate + 1 período`. `periodType` válido: `daily`, `weekly`, `fortnightly`, `monthly`, `custom`.
 > - **Tipo de Cronograma (`scheduleType`)**: Opcional. Acepta `'EQUAL_INSTALLMENTS'` (por defecto: cuotas iguales con capital + interés) o `'INTEREST_ONLY'` (modelo Balloon: solo interés por cuota, capital completo en la última).

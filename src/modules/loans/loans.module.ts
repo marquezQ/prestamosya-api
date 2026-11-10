@@ -11,6 +11,7 @@ import { SimulateLoanUseCase } from './application/use-cases/simulate-loan.use-c
 import { LinkGuaranteeUseCase } from './application/use-cases/link-guarantee.use-case';
 import { UnlinkGuaranteeUseCase } from './application/use-cases/unlink-guarantee.use-case';
 import { GetLoanDetailUseCase } from './application/use-cases/get-loan-detail.use-case';
+import { ListLoansUseCase } from './application/use-cases/list-loans.use-case';
 import { RegisterPaymentUseCase } from './application/use-cases/register-payment.use-case';
 import { VoidPaymentUseCase } from './application/use-cases/void-payment.use-case';
 import { GetPaymentDashboardUseCase } from './application/use-cases/get-payment-dashboard.use-case';
@@ -31,6 +32,7 @@ import { LoansController } from './infrastructure/loans.controller';
     LinkGuaranteeUseCase,
     UnlinkGuaranteeUseCase,
     GetLoanDetailUseCase,
+    ListLoansUseCase,
     RegisterPaymentUseCase,
     VoidPaymentUseCase,
     GetPaymentDashboardUseCase,

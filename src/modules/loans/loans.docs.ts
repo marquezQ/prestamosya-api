@@ -1,9 +1,14 @@
 import { applyDecorators, HttpStatus } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CreateLoanDto } from './dto/create-loan.dto';
 import { LoanResponseDto } from './dto/loan-response.dto';
 import { SimulateLoanDto } from './dto/simulate-loan.dto';
 import { LinkGuaranteeDto } from './dto/link-guarantee.dto';
+import { LoanListItemDto } from './dto/loan-list-item.dto';
+
+export function ApiLoansTag() {
+  return applyDecorators(ApiTags('loans'));
+}
 
 export function ApiCreateLoanDoc() {
   return applyDecorators(
@@ -215,6 +220,21 @@ export function ApiGetLoanInstallmentsDoc() {
     ApiResponse({
       status: HttpStatus.NOT_FOUND,
       description: 'Préstamo no encontrado.',
+    }),
+  );
+}
+
+export function ApiListLoansDoc() {
+  return applyDecorators(
+    ApiOperation({
+      summary: 'Listar préstamos de la cartera',
+      description:
+        'Retorna la lista de préstamos del usuario autenticado según el filtro (activos, al día, en mora, completados) con búsqueda opcional por nombre o carnet del cliente.',
+    }),
+    ApiResponse({
+      status: HttpStatus.OK,
+      description: 'Lista de préstamos obtenida exitosamente.',
+      type: [LoanListItemDto],
     }),
   );
 }
