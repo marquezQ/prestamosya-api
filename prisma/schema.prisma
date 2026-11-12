@@ -277,6 +277,7 @@ model DeviceToken {
 enum Role {
   admin
   collector
+  superadmin
 }
 
 enum Currency {

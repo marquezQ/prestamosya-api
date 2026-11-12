@@ -6,6 +6,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { PrismaModule } from '../../prisma/prisma.module';
 
 /**
  * Módulo de AUTENTICACIÓN (auth = "quién soy", no "qué hago con mi cuenta").
@@ -13,9 +14,13 @@ import { JwtStrategy } from './strategies/jwt.strategy';
  * Contiene: login/logout/me, estrategias JWT, guards y decoradores de
  * seguridad. La CUENTA del usuario (perfil, contraseña) vive en UsersModule
  * y la configuración del negocio en BusinessConfigModule.
+ *
+ * PrismaModule importado para que JwtStrategy pueda consultar isActive/role
+ * en cada request y garantizar expulsión inmediata al desactivar un usuario.
  */
 @Module({
   imports: [
+    PrismaModule,
     // Configuración base de Passport para JWT
     PassportModule.register({ defaultStrategy: 'jwt' }),
     // Configuración dinámica del JWT leyendo del archivo .env
